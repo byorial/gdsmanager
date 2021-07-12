@@ -53,6 +53,7 @@ class GdsManager(LogicModuleBase):
         'gds_chunk_size': '1048756',
         'gds_dir_cache_limit':'1000',
         'scan_notify': 'False',
+        'execute_delta_min': '0',
     }
 
     def __init__(self, P):
@@ -970,6 +971,8 @@ class GdsManager(LogicModuleBase):
 
             service = LibGdrive.sa_auth_by_creds(self.gds_creds)
             target_time = e.last_updated_time if e.last_updated_time != None else e.created_time
+            delta_min = ModelSetting.get_int('execute_delta_min')
+            if delta_min > 0: target_time = target_time - timedelta(minutes=delta_min)
             now = datetime.now()
 
             # 감시대상 하위폴더 로딩
@@ -1003,6 +1006,7 @@ class GdsManager(LogicModuleBase):
 
             curr = 0
             for child in children:
+                curr = curr + 1
                 logger.debug(f'처리[{curr}/{nchildren}]: {child["name"]},{child["id"]},{child["mimeType"]},{child["parents"][0]}')
                 parent_id = child['parents'][0]
                 mtype = 'folder'
@@ -1041,7 +1045,7 @@ class GdsManager(LogicModuleBase):
                 scan_folder_id = parent_id if mtype == 'video' else child['id']
                 scan_item = ScanItem.get_by_folder_id(scan_folder_id)
                 if scan_item == None:
-                    scan_item = ScanItem(entity.id, rname, rpath, scan_folder_id, parent_id, plex_path)
+                    scan_item = ScanItem(e.id, rname, rpath, scan_folder_id, parent_id, plex_path)
 
                 # plex send scan
                 if not self.plex_send_scan(plex_path, callback_id=scan_item.id):
