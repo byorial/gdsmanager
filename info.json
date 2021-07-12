@@ -1,0 +1,10 @@
+{
+    "version": "0.1.0.0",
+    "name": "gdsmanager",
+    "category_name": "service",
+    "icon": "",
+    "developer": "orial",
+    "description": "GDS Manger for SJVA Plugin",
+    "home": "https://github.com/byorial/gdsmanager",
+    "more": ""
+}

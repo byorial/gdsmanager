@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<div>
+  <form id="form_search" name="from_search" class="form-inline" style="text-align:left">
+    <div class="container-fluid">
+      <div class="row show-grid" align="center">
+        <span class="col-md-12" align="left">
+         <span class="col-md-3">
+           <select name='order'>
+             <option value="ctime_desc">등록역순</option>
+             <option value="ctime_asc">등록순</option>
+             <option value="mtime_desc" selected>갱신역순</option>
+             <option value="mtime_asc">갱신순</option>
+           </select>
+	 </span>
+         <span class="col-md-7">
+	  <input id="search_word" name="search_word" class="form-control form-control-sm w-75" type="text" placeholder="경로/폴더ID" aria-label="Search">
+	 </span>
+         <span class="col-md-2">
+          {{ macros.m_button_group([['search', '검색'], ['reset_btn', '리셋']]) }}
+         </span>
+        </span>
+       </div>
+    </div>
+  </form>
+ <hr>
+</div>
+  <div id='page1'></div>
+<div>
+  {{ macros.m_hr_head_top() }}
+  {{ macros.m_row_start('0') }}
+  {{ macros.m_col(3,  macros.m_strong('ID/등록/갱신시각')) }}
+  {{ macros.m_col(6,  macros.m_strong('경로/상세정보')) }}
+  {{ macros.m_col(3,  macros.m_strong('처리기능')) }}
+  {{ macros.m_row_end() }}
+  {{ macros.m_hr_head_bottom() }}
+  <div id="list_div"></div>
+  <div id='page2'></div>
+</div>
+
+<!-- Modal: 감시대상 수정 -->
+{{ macros.m_modal_start('modify_watch_modal', '감시대상등록', 'modal-lg') }}
+  <form id="form_watch">
+    {{ macros.setting_input_text('remote_path_view', '리모트경로', disabled=true) }}
+    {{ macros.setting_input_text('folder_id_view', '폴더ID', disabled=true) }}
+    {{ macros.setting_select_empty('media_types', '미디어유형') }}
+    {{ macros.setting_checkbox('onair', '방영중여부', desc=['On: 방영중, Off: 종영, show의 경우만 지정','* 방송중인 경우 에피소드 추가 확인함']) }}
+    {{ macros.setting_input_int('depth', '탐색깊이', value="1", min="1") }}
+    {{ macros.setting_checkbox('scheduled', '스케쥴링에포함', desc=['On: 포함, Off: 제외']) }}
+    <input type="hidden" id="id" name="id">
+    <input type="hidden" id="remote_path" name="remote_path">
+    <input type="hidden" id="folder_id" name="folder_id">
+  </form>
+  {{ macros.setting_button([['save_watch_btn', '저장']]) }}
+{{ macros.m_modal_end() }}
+<!-- Modal: 감시대상 수정:END -->
+
+<form name="browserform">
+  <input type="hidden" id="remote_name" name="remote_name">
+  <input type="hidden" id="remote_path" name="remote_path">
+  <input type="hidden" id="folder_id" name="folder_id">
+</form>
+
+<script type="text/javascript">
+var package_name = "{{arg['package_name'] }}";
+var sub = "{{arg['sub'] }}";
+var current_data = null;
+var current_page = 1;
+var current_rule = null;
+var formData = null;
+var country = 'all';
+
+$(document).ready(function(){
+  request_search('1', true);
+});
+
+$("body").on('click', '#page', function(e){
+  e.preventDefault();
+  var page = $(this).data('page')
+  request_search(page, true);
+});
+
+$("#search").click(function(e) {
+  e.preventDefault();
+  request_search('1', true);
+});
+
+$("#reset_btn").click(function(e) {
+  e.preventDefault();
+  document.getElementById("search_word").value = '';
+  request_search(current_page, true);
+});
+
+function request_search(page, scroll) {
+  formData = get_formdata('#form_search');
+  current_page = page;
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/web_list',
+    type: "POST", 
+    cache: false,
+    data: formData,
+    dataType: "json",
+    success: function (data) {
+      if (scroll == true) {
+        window.scrollTo(0,0);
+      }
+      make_list(data.list)
+      make_page_html(data.paging)
+    }
+  });
+}
+
+function make_list(data) {
+  var gdurl="https://drive.google.com/drive/u/0/folders/";
+  var str = "";
+  current_data = data;
+  for (i in data) {
+    str += m_row_start();
+    tmp = data[i].id + '<br>';
+    tmp += data[i].created_time + '<br>';
+    if (data[i].last_updated_time) {
+      tmp += data[i].last_updated_time;
+    } else {
+      tmp += '-'
+    }
+    str += m_col(3, tmp)
+
+    //tmp = '<strong>경로: <a href="' + gdurl + data[i].folder_id + '" target="_blank">'+data[i].remote_path+'</a></strong><br>';
+    tmp = '<strong>경로: <a href="javascript:void(0);" onclick="browse(this);" data-idx="'+i+'">'+data[i].remote_path+'</a></strong><br>';
+    tmp += '&nbsp;&nbsp;미디어유형: '+data[i].media_type+', 탐색깊이: '+data[i].depth+', 스케쥴링: '+data[i].scheduled;
+    str += m_col(6, tmp);
+
+    btn_str =  m_button2('watch_modify_btn', '수정', [{'key':'idx', 'value':i }], 'info');
+    btn_str +=  m_button2('one_execute_btn', '1회실행', [{'key':'id', 'value':data[i].id }], 'success');
+    btn_str += m_button2('delete_watch_btn', '삭제', [{'key':'id', 'value':data[i].id}], "danger");
+    tmp = m_button_group(btn_str)
+    str += m_col(3, tmp);
+    str += m_row_end();
+    if (i != data.length -1) {str += m_hr();}
+  }
+  document.getElementById("list_div").innerHTML = str;
+}
+
+$("body").on('click', '#rule_register_btn', function(e){
+  e.preventDefault();
+  var formData = get_formdata('#rule_register_form');
+  rpath = document.getElementById('root_full_path').textContent;
+  tpath = document.getElementById('target_full_path').textContent;
+  formData += '&root_full_path='  + encodeURI(rpath) + '&target_full_path=' + encodeURI(tpath);
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/register_rule',
+    type: "POST",
+    cache: false,
+    data: formData,
+    dataType: "json",
+    success: function (data) {
+      if ( data.ret == 'success') {
+        $.notify('<strong>성공: ' +data.msg+ '</strong>', {type: 'success'});
+      } else {
+        $.notify('<strong>실패: ' +data.msg+ '</strong>', {type: 'warning'});
+      }
+    }
+  });
+  $("#rule_register_modal").modal('hide');
+  location.reload();
+});
+
+$("body").on('click', '#watch_modify_btn', function(e){
+  e.preventDefault();
+  var mtypes = ['show', 'movie'];
+  var idx = $(this).data('idx');
+  var data = current_data[idx];
+  document.getElementById('id').value = data.id;
+  document.getElementById('remote_path').value = data.remote_path;
+  document.getElementById('remote_path_view').value = data.remote_path;
+  document.getElementById('folder_id').value = data.folder_id;
+  document.getElementById('folder_id_view').value = data.folder_id;
+  document.getElementById('depth').value = data.depth;
+  console.log('onair:'+data.onair);
+  console.log('scheduled:'+data.scheduled);
+  if (data.onair == true) {
+    document.getElementById("onair").value = 'on';
+    $('#onair').bootstrapToggle('on')
+  } else {
+    $('#onair').bootstrapToggle('off')
+  }
+  if (data.scheduled == true) {
+    document.getElementById("scheduled").value = 'on';
+    $('#scheduled').bootstrapToggle('on')
+  } else {
+    $('#scheduled').bootstrapToggle('off')
+  }
+  var str = '<select id="media_type" name="media_type" class="form-control form-control-sm">';
+  for (var i=0; i < mtypes.length; i++) {
+    if (mtypes[i] == data.media_type) {
+      str += '<option value="' + mtypes[i]+ '" selected>' + mtypes[i]+ '</option>';
+    } else {
+      str += '<option value="' + mtypes[i]+ '">' + mtypes[i]+ '</option>';
+    }
+  }
+  str += '</select>'
+  document.getElementById("media_types_div").innerHTML = str;
+  $("#modify_watch_modal").modal();
+});
+
+
+$("body").on('click', '#one_execute_btn', function(e){
+  e.preventDefault();
+  db_id = $(this).data('id');
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/one_execute',
+    type: "POST",
+    cache: false,
+    data: {db_id:db_id},
+    dataType: "json",
+    success: function (data) {
+      if ( data.ret == 'success') {
+        $.notify('<strong>완료: ' +data.msg+ '</strong>', {type: 'success'});
+      } else {
+        $.notify('<strong>실패: ' +data.msg+ '</strong>', {type: 'warning'});
+      }
+    }
+  });
+});
+
+$("body").on('click', '#rule_execute_btn', function(e){
+  e.preventDefault();
+  id = $(this).data('id');
+  rule_execute(id);
+});
+
+function rule_execute(id) {
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/execute_rule',
+    type: "POST",
+    cache: false,
+    data: {'id':id},
+    dataType: "json",
+    success: function (data) {
+      if ( data.ret == 'success') {
+        $.notify('<strong>성공: '+data.msg+'</strong>', {type: 'success'});
+      } else {
+        $.notify('<strong>실패: ' +data.msg+ '</strong>', {type: 'warning'});
+      }
+      request_search(current_page, false);
+    }
+  });
+}
+
+$("body").on('click', '#save_watch_btn', function(e) {
+  formData = get_formdata('#form_watch');
+  $.ajax({
+    url: '/'+package_name+'/ajax/'+sub+'/modify_watch',
+    type: 'POST',
+    cache: false,
+    data: formData,
+    dataType: 'json',
+    success: function (data) {
+      if (data.ret == 'success') {
+	$.notify('<strong>성공: '+data.msg+'</strong>', {type: 'success'});
+      } else {
+	$.notify('<strong>실패: '+data.msg+'</strong>', {type: 'warning'});
+      }
+      $("#modify_watch_modal").modal('hide');
+    }
+  });
+});
+
+
+$("body").on('click', '#delete_watch_btn', function(e){
+  e.preventDefault();
+  db_id = $(this).data('id');
+  var msg = '감시대상 목록에서 제외하시겠습니까?.<br>';
+  document.getElementById("confirm_title").innerHTML = "삭제확인";
+  document.getElementById("confirm_body").innerHTML = '<strong>'+msg+'</strong>이 작업은 되돌릴 수 없습니다';
+  $('#confirm_button').attr('onclick', "delete_watch(db_id);");
+  $("#confirm_modal").modal();
+  return;
+});
+
+function limitedSplit(str, delim, limit) {
+  var parts = str.split(delim);
+  var tail = parts.slice(limit).join(delim);
+  var result = parts.slice(0,limit);
+  result.push(tail);
+  return result;
+}
+
+function browse(obj) {
+  var idx = $(obj).data('idx');
+  var data = current_data[idx];
+  var form = document.browserform;
+  var url = '/' +package_name+ '/base/browser';
+  form.action = url;
+  form.method = "post";
+  form.target = "_self";
+  var tmp = limitedSplit(data.remote_path, ':', 1);
+  form.remote_name.value = tmp[0];
+  form.remote_path.value = tmp[1];
+  form.folder_id.value = data.folder_id;
+  form.submit();
+}
+
+</script>    
+{% endblock %}

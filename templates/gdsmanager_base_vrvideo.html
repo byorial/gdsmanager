@@ -1,0 +1,51 @@
+<title>{{arg['play_title']}}</title>
+<script src="https://vjs.zencdn.net/7.11.4/video.min.js"></script>
+<script src="https://videojs-vr.netlify.app/dist/videojs-vr.js"></script>
+<link href="https://vjs.zencdn.net/7.11.4/video-js.css" rel="stylesheet" />
+
+<video id="vr-player" width=960 height=540 class="video-js vjs-default-skin vjs-16-9" autoplay controls>
+  <source
+     src="{{arg['play_source_src']}}"
+     type="{{arg['play_source_type']}}" />
+</video>
+
+
+<script>
+var subtitle_src = "{{arg['play_subtitle_src']}}";
+
+(function(window, videojs) {
+  var player = window.player = videojs('vr-player');
+  player.mediainfo = player.mediainfo || {};
+  var projection = "{{arg['play_vr_projection']}}"
+  player.mediainfo.projection = projection
+  var vr = window.vr = player.vr({projection: projection, debug: true, forceCardboard: false});
+
+  player.ready(function(){
+    // set subtitle track
+    console.log(subtitle_src);
+    if (subtitle_src != "") {
+      var suburl = subtitle_src.replace(/&amp;/g, '&');
+      console.log(suburl);
+      let captionOption = {
+        kind: 'captions',
+        srclang: 'ko',
+        label: 'Korean',
+        src: suburl,
+        mode: 'showing'
+      };
+      player.addRemoteTextTrack(captionOption);
+  
+      var settings = this.textTrackSettings;
+      settings.setValues({
+          "backgroundColor": "#000",
+          "backgroundOpacity": "0",
+          "edgeStyle": "uniform",
+      });
+      settings.updateDisplay();
+    }
+  });
+
+  player.play();
+}(window, window.videojs));
+
+</script>
