@@ -256,7 +256,7 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
 	  if (dt.mimeType == 'application/vnd.google-apps.folder') {
 	    new_obj += '<span class="list-group-item col-md-2">dir</span>'
 	  } else if (dt.mimeType == 'application/vnd.google-apps.shortcut') {
-	    new_obj += '<span class="list-group-item col-md-2">Shorcut</span>'
+	    new_obj += '<span class="list-group-item col-md-2">Shortcut</span>'
 	  } else {
             if (dt.mimeType.startsWith('application/')) {
             	mtype = dt.mimeType.split('/')[1]
