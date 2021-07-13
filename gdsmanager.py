@@ -286,12 +286,12 @@ class GdsManager(LogicModuleBase):
             userid = SystemModelSetting.get('sjva_me_user_id')
             apikey = SystemModelSetting.get('auth_apikey')
             auth_url = "https://sjva.me/sjva/gds_auth.php"
-            data = { 'gds_userid':userid, 'gds_apikey':apikey }
+            data = { 'gds_userid':userid, 'gds_apikey':apikey, 'mode':'default' }
             r = requests.post(auth_url, data=data).json()
             if r['result'] != 'success':
                 logger.error('구드공 사용자 인증 실패: {}'.format(r['result']))
                 return False
-
+            #logger.debug(r['data'])
             self.gds_sa_info = r['data']['remote']['sa']
             self.gds_impersonate = r['data']['remote']['impersonate']
             self.gds_root_folder_id = r['data']['remote']['root_folder_id']
