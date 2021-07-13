@@ -839,13 +839,28 @@ class GdsManager(LogicModuleBase):
                             logger.debug(f'처리[{curr}/{nchildren}]: SKIP: Plex에 존재하는 파일({plex_path})')
                             continue
 
-                        # 마운트 캐시 확인 및 갱신
-                        if not PlexLogicNormal.os_path_exists(plex_path):
-                            ret = self.gds_vfs_refresh(plex_path)
-                            if ret['ret'] != 'success':
-                                logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({plex_path})')
-                                continue
-                            logger.debug(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 완료({plex_path})')
+                        ppath = '/'.join(plex_path.split('/')[:-1])
+                        if mtype == 'folder':
+                            if not PlexLogicNormal.os_path_exists(plex_path):
+                                ret = self.gds_vfs_refresh(ppath, _async=False)
+                                if ret['ret'] != 'success':
+                                    logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
+                                    continue
+                                ret = self.gds_vfs_refresh(plex_path)
+                                if ret['ret'] != 'success':
+                                    logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({plex_path})')
+                                    continue
+                        else:
+                            if not PlexLogicNormal.os_path_exists(ppath):
+                                gppath = '/'.join(plex_path.split('/')[:-2])
+                                ret = self.gds_vfs_refresh(gppath, _async=False)
+                                if ret['ret'] != 'success':
+                                    logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({gppath})')
+                                    continue
+                                ret = self.gds_vfs_refresh(ppath)
+                                if ret['ret'] != 'success':
+                                    logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
+                                    continue
 
                         rname, rpath = sub_remote_path.split(':', maxsplit=1)
                         scan_folder_id = parent_id if mtype == 'video' else child['id']
@@ -883,7 +898,7 @@ class GdsManager(LogicModuleBase):
             if not ret['ret']: return False
             for item in ret['list']:
                 if mtype == 'folder':
-                    if item['folder'] == plex_path: return True
+                    if item['dir'].startswith(plex_path): return True
                 else:
                     if plex_path.find(item['filename']) != -1: return True
             return False
@@ -928,7 +943,7 @@ class GdsManager(LogicModuleBase):
             logger.error(traceback.format_exc())
             return None
 
-    def gds_vfs_refresh(self, plex_path):
+    def gds_vfs_refresh(self, plex_path, _async=True, recursive=False):
         try:
             rc_path = self.get_rc_path(plex_path)
             logger.debug(f'rc_path: {rc_path}')
@@ -941,15 +956,22 @@ class GdsManager(LogicModuleBase):
                 command.append(ModelSetting.get('gds_rc_pass'))
 
             command.append(f'dir={rc_path}')
-            command.append('_async=true')
+            if _async: command.append('_async=true')
+            if recursive: command.append('recursive=true')
             logger.debug(command)
             ret = SystemLogicCommand.execute_command_return(command, format='json')
             logger.debug(ret)
 
-            if 'jobid' not in ret:
-                return {'ret':'error', 'msg':u'마운트 경로 갱신이 실패하였습니다.(mount rc확인필요)'}
+            if _async: # async
+                if 'jobid' not in ret:
+                    return {'ret':'error', 'msg':f'마운트 경로({rc_path}) 갱신이 실패하였습니다.(mount rc확인필요)'}
+                return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({ret["jobid"]}:{rc_path})'}
 
-            return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({ret["jobid"]}:{rc_path})'}
+            # direct
+            if ret['result'][rc_path] != 'OK':
+                return {'ret':'error', 'msg':f'마운트 경로({rc_path}) 갱신이 실패하였습니다.(mount rc확인필요)'}
+            return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})'}
+
         except Exception as e:
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
@@ -1048,13 +1070,30 @@ class GdsManager(LogicModuleBase):
                     continue
 
                 # 마운트 캐시 확인 및 갱신
-                if not PlexLogicNormal.os_path_exists(plex_path):
-                    ret = self.gds_vfs_refresh(plex_path)
-                    if ret['ret'] != 'success':
-                        logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({plex_path})')
-                        continue
-                    logger.debug(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 완료({plex_path})')
+                ppath = '/'.join(plex_path.split('/')[:-1])
+                if mtype == 'folder':
+                    if not PlexLogicNormal.os_path_exists(plex_path):
+                        ret = self.gds_vfs_refresh(ppath, _async=False)
+                        if ret['ret'] != 'success':
+                            logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
+                            continue
+                        ret = self.gds_vfs_refresh(plex_path)
+                        if ret['ret'] != 'success':
+                            logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({plex_path})')
+                            continue
+                else:
+                    if not PlexLogicNormal.os_path_exists(ppath):
+                        gppath = '/'.join(plex_path.split('/')[:-2])
+                        ret = self.gds_vfs_refresh(gppath, _async=False)
+                        if ret['ret'] != 'success':
+                            logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({gppath})')
+                            continue
+                        ret = self.gds_vfs_refresh(ppath)
+                        if ret['ret'] != 'success':
+                            logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
+                            continue
 
+                #logger.debug(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 완료({plex_path})')
                 rname, rpath = sub_remote_path.split(':', maxsplit=1)
                 scan_folder_id = parent_id if mtype == 'video' else child['id']
                 scan_item = ScanItem.get_by_folder_id(scan_folder_id)
@@ -1066,7 +1105,6 @@ class GdsManager(LogicModuleBase):
                     logger.error(f'처리[{curr}/{nchildren}]: 스캔명령 전송 실패({plex_path})')
                     continue
 
-                # 
                 scan_item.status = 'scan_sent'
                 scan_item.updated_time = now
                 scan_item.save()
