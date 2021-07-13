@@ -280,6 +280,25 @@ $("body").on('click', '#delete_watch_btn', function(e){
   return;
 });
 
+function delete_watch(db_id) {
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/delete_watch',
+    type: "POST",
+    cache: false,
+    data: {db_id: db_id},
+    dataType: "json",
+    success: function (data) {
+      if ( data.ret == 'success') {
+        $.notify('<strong>성공: '+data.msg+'</strong>', {type: 'success'});
+      } else {
+        $.notify('<strong>실패: ' +data.msg+ '</strong>', {type: 'warning'});
+      }
+      request_search(current_page, false);
+    }
+  });
+}
+
+
 function limitedSplit(str, delim, limit) {
   var parts = str.split(delim);
   var tail = parts.slice(limit).join(delim);
