@@ -140,7 +140,9 @@ function is_watched(path) {
     return false;
   }
   for (var i = 0; i < watch_pathes.length; i++) {
-    if (path.startsWith(watch_pathes[i])) {
+    arrWatchPath = watch_pathes[i].split('/');
+    arrPath = path.split('/').splice(0, arrWatchPath.length);
+    if (JSON.stringify(arrWatchPath) === JSON.stringify(arrPath)) {
       return true;
     }
   }
