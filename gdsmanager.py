@@ -53,6 +53,7 @@ class GdsManager(LogicModuleBase):
         'gds_chunk_size': '1048756',
         'gds_dir_cache_limit':'1000',
         'scan_notify': 'False',
+        'daily_full_scan': 'False',
         'execute_delta_min': '0',
     }
 
@@ -681,11 +682,15 @@ class GdsManager(LogicModuleBase):
             logger.error(traceback.format_exc())
             return {'ret':'error', 'msg':str(e)}
 
-    def send_scan(self, req):
+    def send_scan(self, req, watch=None):
         try:
-            logger.debug(req.form)
-            remote_path = req.form['remote_path']
-            folder_id = req.form['folder_id'] if 'folder_id' in req.form else '-'
+            if watch != None:
+                remote_path = watch.remote_path
+                folder_id = watch.folder_id
+            else:
+                logger.debug(req.form)
+                remote_path = req.form['remote_path']
+                folder_id = req.form['folder_id'] if 'folder_id' in req.form else '-'
             logger.debug(f'send_scan: {remote_path},{folder_id}')
 
             plex_path = self.get_plex_path(remote_path)
@@ -696,6 +701,7 @@ class GdsManager(LogicModuleBase):
 
             tmp = remote_path.split(':', maxsplit=1)
             scan_item = ScanItem(-1, tmp[0], tmp[1], folder_id, folder_id, plex_path)
+            scan_item.save()
             if not self.plex_send_scan(plex_path, section_id=section_id, callback_id=scan_item.id):
                 logger.error(f'failed to send plex scan: {plex_path}')
                 return {'ret':'error', 'msg':f'plex scan 전송 실패:{plex_path}'}
@@ -779,11 +785,19 @@ class GdsManager(LogicModuleBase):
                     else:
                         subfolders = json.loads(entity.subfolders)
 
+                    now = datetime.now()
+                    if entity.last_updated_time.day != now.day and ModelSetting.get_bool('daily_full_scan'):
+                        logger.debug(f'감시대상 일일 전체스캔: {entity.remote_path}')
+                        ret = self.send_scan(None, watch=entity)
+                        if ret['ret'] == 'success':
+                            entity.last_updated_time = now
+                            entity.save()
+                        continue
+
                     target_parents = [x for x in subfolders.keys()]
                     #logger.debug(f'target_parents: {target_parents}')
                     target_time = entity.last_updated_time if entity.last_updated_time != None else entity.created_time
                     logger.debug(f'감시대상 폴더 스캔: {entity.remote_path}')
-                    now = datetime.now()
                     children = LibGdrive.get_children2(target_parents, mtypes=['video/', 'folder', 'shortcut'],service=service, 
                             time_after=target_time, fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'], 
                             order_by='createdTime', limit=ModelSetting.get_int('query_parents_limit'))
@@ -961,48 +975,48 @@ class GdsManager(LogicModuleBase):
     def one_execute(self, req):
         try:
             db_id = int(req.form['db_id'])
-            e = ModelItem.get_by_id(db_id)
-            if e == None:
+            entity = ModelItem.get_by_id(db_id)
+            if entity == None:
                 return {'ret':'error', 'msg':f'잘못된 id입니다.{db_id}'}
 
-            logger.debug(f'1회실행: {e.remote_path},{e.folder_id},{e.depth}')
+            logger.debug(f'1회실행: {entity.remote_path},{entity.folder_id},{entity.depth}')
             if not self.gds_auth():
                 return {'ret':'error', 'msg':'인증실패: 잠시 후 다시 시도해주세요'}
 
+            now = datetime.now()
             service = LibGdrive.sa_auth_by_creds(self.gds_creds)
-            target_time = e.last_updated_time if e.last_updated_time != None else e.created_time
+            target_time = entity.last_updated_time if entity.last_updated_time != None else entity.created_time
             delta_min = ModelSetting.get_int('execute_delta_min')
             if delta_min > 0: target_time = target_time - timedelta(minutes=delta_min)
-            now = datetime.now()
 
             # 감시대상 하위폴더 로딩
-            if e.subfolders == None:
-                subfolders = self.load_subfolders(e, service)
+            if entity.subfolders == None:
+                subfolders = self.load_subfolders(entity, service)
                 if subfolders == None:
                     logger.error(f'감시대상 하위폴더 로딩 실패: {entity.remote_path}')
-                    return {'ret':'error', 'msg':f'감시대상 하위폴더 조회실패: {e.remote_path}'}
-                e.subfolders = json.dumps(subfolders)
-                e.save()
+                    return {'ret':'error', 'msg':f'감시대상 하위폴더 조회실패: {entity.remote_path}'}
+                entity.subfolders = json.dumps(subfolders)
+                entity.save()
             # 이미 하위폴더를 로드한 경우 db에서 불러옴
             else:
-                subfolders = json.loads(e.subfolders)
+                subfolders = json.loads(entity.subfolders)
 
             target_parents = [x for x in subfolders.keys()]
             children = LibGdrive.get_children2(target_parents, mtypes=['video/', 'folder', 'shortcut'],service=service, 
                     time_after=target_time, fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'], 
                     order_by='createdTime', limit=ModelSetting.get_int('query_parents_limit'))
             if children == None:
-                logger.error(f'자식폴더 변경사항 조회 실패: {e.remote_path}')
-                return {'ret':'error', 'msg':f'변경사항 조회 실패{e.remote_path}'}
+                logger.error(f'자식폴더 변경사항 조회 실패: {entity.remote_path}')
+                return {'ret':'error', 'msg':f'변경사항 조회 실패{entity.remote_path}'}
 
-            remote_path = e.remote_path
-            folder_id = e.folder_id
+            remote_path = entity.remote_path
+            folder_id = entity.folder_id
             nchildren = len(children)
-            logger.debug(f'대상경로({e.remote_path})에  {nchildren}개의 새로운 파일/폴더 검색됨')
+            logger.debug(f'대상경로({entity.remote_path})에  {nchildren}개의 새로운 파일/폴더 검색됨')
             if nchildren == 0:
-                e.last_updated_time = now
-                e.save()
-                return {'ret':'success', 'msg':f'완료: {e.remote_path}, 새로운 파일/폴더가 없습니다.'}
+                entity.last_updated_time = now
+                entity.save()
+                return {'ret':'success', 'msg':f'완료: {entity.remote_path}, 새로운 파일/폴더가 없습니다.'}
 
             curr = 0
             for child in children:
@@ -1045,7 +1059,7 @@ class GdsManager(LogicModuleBase):
                 scan_folder_id = parent_id if mtype == 'video' else child['id']
                 scan_item = ScanItem.get_by_folder_id(scan_folder_id)
                 if scan_item == None:
-                    scan_item = ScanItem(e.id, rname, rpath, scan_folder_id, parent_id, plex_path)
+                    scan_item = ScanItem(entity.id, rname, rpath, scan_folder_id, parent_id, plex_path)
 
                 # plex send scan
                 if not self.plex_send_scan(plex_path, callback_id=scan_item.id):
@@ -1059,11 +1073,11 @@ class GdsManager(LogicModuleBase):
 
                 logger.debug(f'처리[{curr}/{nchildren}]: 스캔명령 전송 완료({plex_path})')
 
-            e.subfolders = json.dumps(subfolders)
-            e.last_updated_time = now
-            e.save()
+            entity.subfolders = json.dumps(subfolders)
+            entity.last_updated_time = now
+            entity.save()
 
-            return {'ret':'success', 'msg':f'완료: {e.remote_path}'}
+            return {'ret':'success', 'msg':f'완료: {entity.remote_path}'}
         except Exception as e:
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
