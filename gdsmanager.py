@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import requests
 from flask import request, render_template, jsonify, redirect, Response
 # sjva
-from framework import py_urllib, SystemModelSetting, path_data, scheduler, db, socketio
+from framework import py_urllib, py_urllib2, SystemModelSetting, path_data, scheduler, db, socketio
 from plugin import LogicModuleBase
 from tool_base import ToolUtil 
 from system.logic_command import SystemLogicCommand
@@ -696,8 +696,23 @@ class GdsManager(LogicModuleBase):
             plex_path = self.get_plex_path(remote_path)
             section_id = PlexLogicNormal.get_section_id_by_filepath(plex_path)
             if section_id == -1:
-                logger.debug(f'{plex_path} does not exists in Plex Library')
-                return {'ret':'error', 'msg':f'Plex 라이브러리에 {plex_path} 를 등록해주세요'}
+                found = False
+                server_url = PlexModelSetting.get('server_url')
+                server_token = PlexModelSetting.get('server_token')
+                cmd = 'get_setcion'
+                url = '%s/:/plugins/com.plexapp.plugins.SJVA/function/command?cmd=%s&param1=%s&param2=%s&X-Plex-Token=%s' % (server_url, cmd, '', '', server_token)
+                #logger.debug(url)
+                request = py_urllib2.Request(url)
+                response = py_urllib2.urlopen(request)
+                data = response.read()
+                data = json.loads(data)
+                for item in data['data']:
+                    if item['location'].startswith(plex_path):
+                        found = True
+                        break
+                if found != True:
+                    logger.debug(f'{plex_path} does not exists in Plex Library')
+                    return {'ret':'error', 'msg':f'Plex 라이브러리에 {plex_path} 를 등록해주세요'}
 
             tmp = remote_path.split(':', maxsplit=1)
             scan_item = ScanItem(-1, tmp[0], tmp[1], folder_id, folder_id, plex_path)
@@ -1123,11 +1138,13 @@ class GdsManager(LogicModuleBase):
     def plex_send_scan(self, plex_path, callback_id=None, section_id = -1):
         try:
             logger.debug(f'스캔명령 전송: {plex_path},{callback_id}')
+            """
             if section_id == -1:
                 section_id = PlexLogicNormal.get_section_id_by_filepath(plex_path)
                 if section_id == -1:
                     logger.error(f'failed to get section_id by path: {plex_path}')
                     return False
+            """
 
             scan_path = py_urllib.quote(plex_path)
             ddns = SystemModelSetting.get('ddns')
