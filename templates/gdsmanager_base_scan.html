@@ -124,7 +124,7 @@ function make_list(data) {
       str_status = '스캔완료'
     }
     str += m_col(1, str_status);
-    btn_str =  m_button2('scan_btn', '재스캔', [{'key':'idx', 'value':i }], 'info');
+    btn_str =  m_button2('rescan_btn', '재스캔', [{'key':'idx', 'value':i }], 'info');
     btn_str +=  m_button2('delete_btn', '삭제', [{'key':'id', 'value':data[i].id }], 'danger');
     tmp = m_button_group(btn_str)
     str += m_col(2, tmp);
@@ -168,17 +168,18 @@ $("body").on('click', '#delete_btn', function(e){
   return;
 });
 
-$("body").on('click', '#scan_btn', function(e){
+$("body").on('click', '#rescan_btn', function(e){
   e.preventDefault();
   idx = $(this).data('idx');
   data = current_data[idx];
   remote_path = data.remote_name + ':' + data.remote_path;
   folder_id = data.folder_id;
+  db_id = data.id;
   $.ajax({
     url: '/' + package_name + '/ajax/'+sub+'/send_scan',
     type: "POST",
     cache: false,
-    data: {remote_path: remote_path, folder_id:folder_id},
+    data: {db_id:db_id, remote_path: remote_path, folder_id:folder_id},
     dataType: "json",
     success: function (data) {
       if ( data.ret == 'success') {

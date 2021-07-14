@@ -684,14 +684,20 @@ class GdsManager(LogicModuleBase):
 
     def send_scan(self, req, watch=None):
         try:
+            watch_id = -1
+            db_id = -1
             if watch != None:
                 remote_path = watch.remote_path
                 folder_id = watch.folder_id
+                watch_id = watch.id
             else:
                 logger.debug(req.form)
                 remote_path = req.form['remote_path']
                 folder_id = req.form['folder_id'] if 'folder_id' in req.form else '-'
+                db_id = int(req.form['db_id']) if 'db_id' in req.form else -1
+
             logger.debug(f'send_scan: {remote_path},{folder_id}')
+            scan_list = []
 
             plex_path = self.get_plex_path(remote_path)
             section_id = PlexLogicNormal.get_section_id_by_filepath(plex_path)
@@ -709,14 +715,33 @@ class GdsManager(LogicModuleBase):
                 for item in data['data']:
                     if item['location'].startswith(plex_path):
                         found = True
-                        break
+                        scan_list.append({'id':item['id'], 'location':item['location']})
                 if found != True:
                     logger.debug(f'{plex_path} does not exists in Plex Library')
                     return {'ret':'error', 'msg':f'Plex 라이브러리에 {plex_path} 를 등록해주세요'}
 
+                tmp = remote_path.split(':', maxsplit=1)
+                scan_item = ScanItem(watch_id, tmp[0], tmp[1], folder_id, folder_id, plex_path)
+                scan_item.save()
+                for s in scan_list:
+                    ppath = s['location']
+                    section_id = int(s['id'])
+                    if not self.plex_send_scan(ppath, section_id=section_id, callback_id=scan_item.id):
+                        logger.error(f'failed to send plex scan: {ppath}')
+                        return {'ret':'error', 'msg':f'plex scan 전송 실패:{ppath}'}
+
+                scan_item.status = 'scan_sent'
+                scan_item.save()
+                logger.debug(f'send_scan: END:{remote_path}')
+                return {'ret':'success', 'msg':f'완료: {remote_path}'}
+
             tmp = remote_path.split(':', maxsplit=1)
-            scan_item = ScanItem(-1, tmp[0], tmp[1], folder_id, folder_id, plex_path)
-            scan_item.save()
+            if db_id != -1:
+                scan_item = ScanItem.get_by_id(db_id)
+            else:
+                scan_item = ScanItem(-1, tmp[0], tmp[1], folder_id, folder_id, plex_path)
+                scan_item.save()
+
             if not self.plex_send_scan(plex_path, section_id=section_id, callback_id=scan_item.id):
                 logger.error(f'failed to send plex scan: {plex_path}')
                 return {'ret':'error', 'msg':f'plex scan 전송 실패:{plex_path}'}
@@ -941,6 +966,21 @@ class GdsManager(LogicModuleBase):
             logger.error(traceback.format_exc())
             return None
 
+    def get_remote_path(self, plex_path):
+        try:
+            ret = plex_path
+            gds_remote_root = ModelSetting.get('gds_remote_name') + ':'
+            plex_mount_path = ModelSetting.get('gds_plex_mount_path')
+            if plex_path.startswith(plex_mount_path):
+                ret = plex_mount_path.replace(plex_mount_path, gds_remote_root).replace('\\\\', '\\').replace('\\', '/')
+                if plex_mount_path[0] != '/': ret = ret.replace('\\', '/')
+            return ret
+
+        except Exception as e:
+            logger.error('Exception:%s', e)
+            logger.error(traceback.format_exc())
+            return None
+
     def get_watch_pathes(self):
         pathes = list(set([x.remote_path for x in ModelItem.get_all_entities()]))
         return '|'.join(pathes)
@@ -1138,13 +1178,11 @@ class GdsManager(LogicModuleBase):
     def plex_send_scan(self, plex_path, callback_id=None, section_id = -1):
         try:
             logger.debug(f'스캔명령 전송: {plex_path},{callback_id}')
-            """
             if section_id == -1:
                 section_id = PlexLogicNormal.get_section_id_by_filepath(plex_path)
                 if section_id == -1:
                     logger.error(f'failed to get section_id by path: {plex_path}')
                     return False
-            """
 
             scan_path = py_urllib.quote(plex_path)
             ddns = SystemModelSetting.get('ddns')
