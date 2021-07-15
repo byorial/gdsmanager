@@ -989,7 +989,7 @@ class GdsManager(LogicModuleBase):
         try:
             ret = plex_path
             plex_mount_path = ModelSetting.get('gds_plex_mount_path')
-            ret = ret.replace(plex_mount_path, '')
+            ret = ret.replace(plex_mount_path, '').replace('\\\\','/').replace('\\','/')
             if ret[0] == '/': ret = ret[1:]
             return ret
 
