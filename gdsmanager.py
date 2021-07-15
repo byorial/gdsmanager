@@ -660,10 +660,11 @@ class GdsManager(LogicModuleBase):
                 curr = curr + 1
                 logger.debug(f'child[{curr}/{nchildren}]: started : {child["name"]},{child["id"]}')
                 plex_path = self.get_plex_path(remote_path)
+                delim = '/' if plex_path[0] == '/' else '\\'
                 if child['mimeType'] == 'application/vnd.google-apps.folder' or  \
                         (child['mimeType'] == 'application/vnd.google-apps.shortcut' and \
                                 child['shortcutDetails']['targetMimeType'] == 'application/vnd.google-apps.folder'):
-                    plex_path = plex_path + '/' + child['name']
+                    plex_path = plex_path + delim + child['name']
 
                 logger.debug(f'child[{curr}/{nchildren}]: plex_path: {plex_path}')
                 if self.is_in_plex(plex_path):
@@ -926,7 +927,8 @@ class GdsManager(LogicModuleBase):
                             logger.debug(f'처리[{curr}/{nchildren}]: SKIP: Plex에 존재하는 파일({plex_path})')
                             continue
 
-                        ppath = '/'.join(plex_path.split('/')[:-1])
+                        delim = '/' if plex_path[0] == '/' else '\\'
+                        ppath = delim.join(plex_path.split(delim)[:-1])
                         if mtype == 'folder':
                             if not PlexLogicNormal.os_path_exists(plex_path):
                                 ret = self.gds_vfs_refresh(ppath, _async=False)
@@ -939,7 +941,7 @@ class GdsManager(LogicModuleBase):
                                     continue
                         else:
                             if not PlexLogicNormal.os_path_exists(ppath):
-                                gppath = '/'.join(plex_path.split('/')[:-2])
+                                gppath = delim.join(plex_path.split(delim)[:-2])
                                 ret = self.gds_vfs_refresh(gppath, _async=False)
                                 if ret['ret'] != 'success':
                                     logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({gppath})')
@@ -1004,7 +1006,7 @@ class GdsManager(LogicModuleBase):
             gds_remote_root = ModelSetting.get('gds_remote_name') + ':'
             plex_mount_path = ModelSetting.get('gds_plex_mount_path')
             if remote_path.startswith(gds_remote_root):
-                ret = remote_path.replace(gds_remote_root, plex_mount_path).replace('\\\\', '\\').replace('\\', '/')
+                ret = remote_path.replace(gds_remote_root, plex_mount_path)
                 if plex_mount_path[0] != '/': ret = ret.replace('/', '\\')
             return ret
 
@@ -1036,7 +1038,7 @@ class GdsManager(LogicModuleBase):
         try:
             ret = plex_path
             plex_mount_path = ModelSetting.get('gds_plex_mount_path')
-            ret = ret.replace(plex_mount_path, '').replace('\\\\','/').replace('\\','/')
+            ret = ret.replace(plex_mount_path, '').replace('\\\\','\\').replace('\\','/')
             if ret[0] == '/': ret = ret[1:]
             return ret
 
@@ -1178,20 +1180,22 @@ class GdsManager(LogicModuleBase):
                     continue
 
                 # 마운트 캐시 확인 및 갱신
-                ppath = '/'.join(plex_path.split('/')[:-1])
+                delim = '/' if plex_path[0] == '/' else '\\'
+                ppath = delim.join(plex_path.split(delim)[:-1])
                 if mtype == 'folder':
                     if not PlexLogicNormal.os_path_exists(plex_path):
                         ret = self.gds_vfs_refresh(ppath, _async=False)
                         if ret['ret'] != 'success':
                             logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
                             continue
+                        logger.debug(f'12312312pp:{plex_path}')
                         ret = self.gds_vfs_refresh(plex_path)
                         if ret['ret'] != 'success':
                             logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({plex_path})')
                             continue
                 else:
                     if not PlexLogicNormal.os_path_exists(ppath):
-                        gppath = '/'.join(plex_path.split('/')[:-2])
+                        gppath = delim.join(plex_path.split(delim)[:-2])
                         ret = self.gds_vfs_refresh(gppath, _async=False)
                         if ret['ret'] != 'success':
                             logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({gppath})')
