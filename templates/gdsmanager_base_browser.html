@@ -128,9 +128,33 @@ $(document).ready(function(){
 	    }
 	  }
 	},
-        "copypath": {name: "경로복사", icon: "fa-copy"},
-        "refresh": {name: "마운트캐시갱신", icon: "fa-refresh"},
-        "scan": {name: "스캔명령 전송", icon: "fa-share"},
+        "copypath": {name: "경로복사", icon: "fa-copy",
+	  disabled: function(key, options) {
+	    if (options.$trigger.attr('name') == '..') {
+	      return true;
+	    } else {
+              return false;
+	    }
+	  }
+	},
+        "refresh": {name: "마운트캐시갱신", icon: "fa-refresh",
+	  disabled: function(key, options) {
+	    if (options.$trigger.attr('name') == '..') {
+	      return true;
+	    } else {
+              return false;
+	    }
+	  }
+	},
+        "scan": {name: "스캔명령 전송", icon: "fa-share",
+	  disabled: function(key, options) {
+	    if (options.$trigger.attr('name') == '..') {
+	      return true;
+	    } else {
+              return false;
+	    }
+	  }
+	},
     }
   });
 });
@@ -138,6 +162,9 @@ $(document).ready(function(){
 function is_watched(path) {
   if (watch_pathes.length == 0) {
     return false;
+  }
+  if (path.endsWith('..')) {
+    return true;
   }
   for (var i = 0; i < watch_pathes.length; i++) {
     arrWatchPath = watch_pathes[i].split('/');
