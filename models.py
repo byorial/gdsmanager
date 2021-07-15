@@ -25,6 +25,7 @@ class ModelWatchTargetItem(db.Model):
     scheduled = db.Column(db.Boolean)
     subfolders = db.Column(db.JSON)
     last_updated_time = db.Column(db.DateTime)
+    last_fullscan_time = db.Column(db.DateTime)
 
     def __init__(self, remote_path, folder_id, media_type, depth, onair, scheduled):
         self.created_time = datetime.now()
@@ -36,6 +37,7 @@ class ModelWatchTargetItem(db.Model):
         self.scheduled = scheduled
         self.subfolders = None
         self.last_updated_time = None
+        self.last_fullscan_time = None
 
     def __repr__(self):
         return repr(self.as_dict())
@@ -43,10 +45,10 @@ class ModelWatchTargetItem(db.Model):
     def as_dict(self):
         ret = {x.name: getattr(self, x.name) for x in self.__table__.columns}
         ret['created_time'] = self.created_time.strftime('%m-%d %H:%M:%S') 
-        if self.last_updated_time == None:
-            ret['last_updated_time'] = u'-'
-        else:
-            ret['last_updated_time'] = self.last_updated_time.strftime('%m-%d %H:%M:%S') 
+        if self.last_updated_time == None: ret['last_updated_time'] = u'-'
+        else: ret['last_updated_time'] = self.last_updated_time.strftime('%m-%d %H:%M:%S') 
+        if self.last_fullscan_time == None: ret['last_fullscan_time'] = u'-'
+        else: ret['last_fullscan_time'] = self.last_fullscan_time.strftime('%m-%d %H:%M:%S') 
         return ret
 
     def save(self):

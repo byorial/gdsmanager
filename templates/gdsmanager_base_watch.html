@@ -130,6 +130,12 @@ function make_list(data) {
     //tmp = '<strong>경로: <a href="' + gdurl + data[i].folder_id + '" target="_blank">'+data[i].remote_path+'</a></strong><br>';
     tmp = '<strong>경로: <a href="javascript:void(0);" onclick="browse(this);" data-idx="'+i+'">'+data[i].remote_path+'</a></strong><br>';
     tmp += '&nbsp;&nbsp;미디어유형: '+data[i].media_type+', 탐색깊이: '+data[i].depth+', 스케쥴링: '+data[i].scheduled;
+    tmp += '<br>&nbsp;&nbsp;이전 전체스캔: ';
+    if (data[i].last_fullscan_time) {
+      tmp += data[i].last_fullscan_time;
+    } else {
+      tmp += '-'
+    }
     str += m_col(6, tmp);
 
     btn_str =  m_button2('watch_modify_btn', '수정', [{'key':'idx', 'value':i }], 'info');

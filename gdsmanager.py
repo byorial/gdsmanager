@@ -28,7 +28,7 @@ ModelSetting = P.ModelSetting
 
 class GdsManager(LogicModuleBase):
     db_default = {
-        'db_version': '1',
+        'db_version': '2',
 
         # for schedule
         'base_auto_start': 'False',
@@ -54,7 +54,9 @@ class GdsManager(LogicModuleBase):
         'gds_dir_cache_limit':'1000',
         'scan_notify': 'False',
         'daily_full_scan': 'False',
+        'fullscan_interval': '0',
         'execute_delta_min': '0',
+        'except_paths': '',
     }
 
     def __init__(self, P):
@@ -67,6 +69,7 @@ class GdsManager(LogicModuleBase):
         self.last_path = ''
         self.dir_cache = {}
         self.token_cache = {}
+        self.fullscan_interval = 0
         
         # for gds
         self.gds_auth_status = False
@@ -75,6 +78,7 @@ class GdsManager(LogicModuleBase):
         self.gds_root_folder_id = None
         self.gds_scopes = None
         self.gds_creds = None
+        self.except_paths = []
 
     def plugin_load(self):
         self.dir_cache = json.loads(ModelSetting.get('gds_dir_cache'))
@@ -83,6 +87,8 @@ class GdsManager(LogicModuleBase):
         self.last_folderid = ModelSetting.get('gds_last_folderid')
         self.last_path = ModelSetting.get('gds_last_path')
         self.gds_auth_status = self.gds_auth_init()
+        self.fullscan_interval = ModelSetting.get_int('fullscan_interval')
+        self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
 
     def plugin_unload(self):
         logger.debug('dump dircache: '+str(len(self.dir_cache))+' item(s) dumped')
@@ -90,6 +96,34 @@ class GdsManager(LogicModuleBase):
         ModelSetting.set('gds_last_remote', self.last_remote)
         ModelSetting.set('gds_last_folderid', self.last_folderid)
         ModelSetting.set('gds_last_path', self.last_path)
+
+    def setting_save_after(self):
+        if self.fullscan_interval != ModelSetting.get_int('fullscan_interval'):
+            logger.debug(f'전체스캔 주기 변경: {self.fullscan_interval} -> {ModelSetting.get("fullscan_interval")}')
+            self.fullscan_interval = ModelSetting.get_int('fullscan_interval')
+            if self.fullscan_interval == 0:
+                logger.debug('감시대상 전체스캔을 수행하지 않음')
+            else:
+                logger.debug(f'감시대상의 전체스캔을 {self.fullscan_interval} 일 후에 실행')
+
+        self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
+
+    def migration(self):
+        try:
+            if ModelSetting.get('db_version') == '1':
+                import sqlite3
+                db_file = os.path.join(path_data, 'db', '%s.db' % package_name)
+                connection = sqlite3.connect(db_file)
+                cursor = connection.cursor()
+                query = 'ALTER TABLE %s_watch_target_item ADD last_fullscan_time DATETIME' % (package_name)
+                cursor.execute(query)
+                connection.close()
+                ModelSetting.set('db_version', '2')
+                db.session.flush()
+                logger.debug('last_fullscan_date Alterred')
+        except Exception as exception:
+            logger.error('Exception:%s', exception)
+            logger.error(traceback.format_exc())
 
     def process_menu(self, sub, req):
         try:
@@ -725,10 +759,10 @@ class GdsManager(LogicModuleBase):
                 scan_item.save()
                 for s in scan_list:
                     ppath = s['location']
-                    section_id = int(s['id'])
-                    if not self.plex_send_scan(ppath, section_id=section_id, callback_id=scan_item.id):
-                        logger.error(f'failed to send plex scan: {ppath}')
-                        return {'ret':'error', 'msg':f'plex scan 전송 실패:{ppath}'}
+                    sid = int(s['id'])
+                    if not self.plex_send_scan(ppath, section_id=sid, callback_id=scan_item.id):
+                        logger.error(f'failed to send plex scan: {ppath}({sid})')
+                        return {'ret':'error', 'msg':f'plex scan 전송 실패:{ppath}({sid})'}
 
                 scan_item.status = 'scan_sent'
                 scan_item.save()
@@ -812,6 +846,10 @@ class GdsManager(LogicModuleBase):
             logger.debug('감시대상 폴더: %d', total)
             if total != 0 and self.gds_auth():
                 service = LibGdrive.sa_auth_by_creds(self.gds_creds)
+                if service == None:
+                    logger.error('Gdrive API 인증 실패, sjva.me 사용자ID, apikey를 확인해주세요')
+                    return
+
                 for entity in entities:
                     # 감시대상 하위폴더 로딩
                     if entity.subfolders == None:
@@ -826,11 +864,15 @@ class GdsManager(LogicModuleBase):
                         subfolders = json.loads(entity.subfolders)
 
                     now = datetime.now()
-                    if entity.last_updated_time.day != now.day and ModelSetting.get_bool('daily_full_scan'):
-                        logger.debug(f'감시대상 일일 전체스캔: {entity.remote_path}')
+                    if entity.last_fullscan_time == None:
+                        entity.last_fullscan_time = entity.last_updated_time if entity.last_updated_time != None else entity.created_time
+
+                    if self.is_fullscan_target(entity.last_fullscan_time):
+                        logger.debug(f'감시대상 전체스캔: {entity.remote_path}')
                         ret = self.send_scan(None, watch=entity)
                         if ret['ret'] == 'success':
                             entity.last_updated_time = now
+                            entity.last_fullscan_time = now
                             entity.save()
                         continue
 
@@ -871,6 +913,11 @@ class GdsManager(LogicModuleBase):
                         else:
                             mtype = 'video'
                             sub_remote_path = subfolders[parent_id] + '/' + child['name']
+
+                        # 제외폴더의 경우 스킵
+                        if self.is_except_path(sub_remote_path.split(':', maxsplit=1)[1]):
+                            logger.debug(f'처리[{curr}/{nchildren}]: SKIP: 제외대상 경로에 포함({sub_remote_path})')
+                            continue
 
                         # Plex에 있는 경우 스킵
                         plex_path = self.get_plex_path(sub_remote_path)
@@ -989,7 +1036,7 @@ class GdsManager(LogicModuleBase):
         try:
             ret = plex_path
             plex_mount_path = ModelSetting.get('gds_plex_mount_path')
-            ret = ret.replace(plex_mount_path, '')
+            ret = ret.replace(plex_mount_path, '').replace('\\\\', '/').replace('\\', '/')
             if ret[0] == '/': ret = ret[1:]
             return ret
 
@@ -1016,6 +1063,8 @@ class GdsManager(LogicModuleBase):
             logger.debug(command)
             ret = SystemLogicCommand.execute_command_return(command, format='json')
             logger.debug(ret)
+            if ret == None:
+                return {'ret':'error', 'msg':f'마운트 경로({rc_path}) 갱신이 실패하였습니다.(mount rc확인필요)'}
 
             if _async: # async
                 if 'jobid' not in ret:
@@ -1116,6 +1165,10 @@ class GdsManager(LogicModuleBase):
                 else:
                     mtype = 'video'
                     sub_remote_path = subfolders[parent_id] + '/' + child['name']
+
+                if self.is_except_path(sub_remote_path.split(':', maxsplit=1)[1]):
+                    logger.debug(f'처리[{curr}/{nchildren}]: SKIP: 제외대상 경로에 포함({sub_remote_path})')
+                    continue
 
                 # Plex에 있는 경우 스킵
                 plex_path = self.get_plex_path(sub_remote_path)
@@ -1227,13 +1280,42 @@ class GdsManager(LogicModuleBase):
             logger.error(traceback.format_exc())
             return {'ret':'error', 'msg':str(e)}
 
+    def str2date(self, time_str):
+        fm = '%Y-%m-%d %H:%M:%S'
+        return datetime.strptime(time_str, fm)
+
+    def date2str(self, time):
+        fm = '%Y-%m-%d %H:%M:%S'
+        return time.strftime(fm)
+
+    def is_fullscan_target(self, prev_fullscan_time):
+        interval = ModelSetting.get_int('fullscan_interval')
+        if interval == 0: return False
+        now = datetime.now()
+        target_time = prev_fullscan_time + timedelta(days=interval)
+        return (now > target_time)
+
+    def is_except_path(self, path):
+        from fnmatch import fnmatch
+        for ex in self.except_paths:
+            if fnmatch(path, ex):
+                return True
+        return False
+
     @staticmethod
-    def send_noti(scan_id):
+    def send_noti(scan_id, filename=None):
         message_id = 'gdsmanager_scan_completed'
         e = ScanItem.get_by_id(scan_id)
         if not e: return
-        msg = '[구드공관리] 신규아이템 추가 알림\n'
-        msg = msg + f'경로: {e.remote_path}\n'
+        if filename != None:
+            if filename == e.plex_path:
+                msg = '[구드공관리] 신규아이템 추가 알림\n'
+            else:
+                msg = '[구드공관리] 스캔완료 알림\n'
+            msg = msg + f'경로: {filename}\n'
+        else:
+            msg = '[구드공관리] 신규아이템 추가 알림\n'
+            msg = msg + f'경로: {e.remote_path}\n'
         ToolBaseNotify.send_message(msg, message_id=message_id)
 
     @staticmethod
@@ -1254,7 +1336,7 @@ class GdsManager(LogicModuleBase):
             scan_item.updated_time = datetime.now()
             scan_item.save()
             if ModelSetting.get_bool('scan_notify'):
-                GdsManager.send_noti(scan_item.id)
+                GdsManager.send_noti(scan_item.id, filename=filename)
 
         except Exception as e:
             logger.error('Exception:%s', e)

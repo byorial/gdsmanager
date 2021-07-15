@@ -8,6 +8,7 @@
   <nav>
     {{ macros.m_tab_head_start() }}
       {{ macros.m_tab_head2('gds', 'GDS', true) }}
+      {{ macros.m_tab_head2('except', '제외경로', false) }}
       {{ macros.m_tab_head2('etc', '기타', false) }}
     {{ macros.m_tab_head_end() }}
   </nav>
@@ -19,13 +20,16 @@
       {{ macros.setting_checkbox('base_auto_start', '시작시 자동실행', value=arg['base_auto_start'], desc='On : 시작시 자동으로 스케쥴러에 등록됩니다.') }}
       {{ macros.setting_input_text('gds_remote_name', '구드공리모트명', value=arg['gds_remote_name'], desc=['구드공 바로보기용 리모트명, SJVA사용자 전용','rclone.conf에 없는 리모트명으로 입력해야함', '구드공 바로보기용 리모트 추가 불필요']) }}
       {{ macros.setting_input_text('gds_plex_mount_path', '구드공마운트경로', value=arg['gds_plex_mount_path'], desc=['Plex 기준 구드공 마운트 경로', 'GDS: 를 /mnt/gds로 마운트한 경우 /mnt/gds']) }}
-      {{ macros.setting_checkbox('daily_full_scan', '매일 전체스캔', value=arg['daily_full_scan'], desc='On : 스케쥴링에 포함된 감시대상 목록에 대해 1회/일 전체스캔명령 전송') }}
+      {{ macros.setting_input_int('fullscan_interval', '전체스캔주기', value=arg['fullscan_interval'], desc=['스케쥴링 대상에 대해 전체스캔을 실행할 주기(단위 일)', '0: 전체스캔안함', '1 ~ : 지정된 일수에 한번씩 전체스캔실행','최초 실행은 이 이 값이 변경된 시점 이후 n일에 수행함']) }}
       {{ macros.setting_input_text('gds_rc_addr', 'RC 주소', value=arg['gds_rc_addr'], desc=['Plex에 마운트된 리모트 RC주소','127.0.0.1:5572 형태로 ip:port 지정']) }}
       {{ macros.setting_checkbox('gds_use_rc_auth', 'RC 인증 사용', value=arg['gds_use_rc_auth'], desc=['On: rlcone rc 인증 사용']) }}
       <div id="gds_use_rc_auth_div" class="collapse">
       {{ macros.setting_input_text('gds_rc_user', 'RC 사용자', value=arg['gds_rc_user'], desc=['RC User, 인증미사용시 RC인증사용 Off']) }}
       {{ macros.setting_input_text('gds_rc_pass', 'RC 암호', value=arg['gds_rc_pass'], desc=['RC Pass, 인증미사용시 RC인증사용 Off']) }}
       </div>
+    {{ macros.m_tab_content_end() }}  
+    {{ macros.m_tab_content_start('except', false) }}
+      {{ macros.setting_input_textarea('except_paths', '마운트 제외 경로', value=arg['except_paths'], col='12', row='20', desc=['Rclone Mount 시 filter로 제외한 목록, 앞에 "-"없이 제외할 목록만 입력, 구분자는 엔터','예) /VOD/1.방송중/시사/**']) }}
     {{ macros.m_tab_content_end() }}  
     {{ macros.m_tab_content_start('etc', false) }}
       {{ macros.setting_input_int('gds_chunk_size', 'Chunk 크기', value=arg['gds_chunk_size'], desc=['파일요청시 Chunk 크기(1회 요청사이즈), Byte단위']) }}
