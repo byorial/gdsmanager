@@ -950,6 +950,12 @@ class GdsManager(LogicModuleBase):
                                 if ret['ret'] != 'success':
                                     logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
                                     continue
+                            else:
+                                if not PlexLogicNormal.os_path_exists(plex_path):
+                                    ret = self.gds_vfs_refresh(ppath)
+                                    if ret['ret'] != 'success':
+                                        logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
+                                        continue
 
                         rname, rpath = sub_remote_path.split(':', maxsplit=1)
                         scan_folder_id = parent_id if mtype == 'video' else child['id']
