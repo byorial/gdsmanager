@@ -1,12 +1,13 @@
 #########################################################
 # python
-import os, sys, traceback, re, json
+import os, sys, traceback, re, json, threading, time
 from datetime import datetime, timedelta
 # third-party
 import requests
 from flask import request, render_template, jsonify, redirect, Response
 # sjva
-from framework import py_urllib, py_urllib2, SystemModelSetting, path_data, scheduler, db, socketio
+from framework import py_urllib, py_urllib2, SystemModelSetting, path_data, scheduler, db, socketio, py_queue
+#from framework.common.util import convert_srt_to_vtt as convSrt2Vtt # TODO
 from plugin import LogicModuleBase
 from tool_base import ToolUtil 
 from system.logic_command import SystemLogicCommand
@@ -17,7 +18,7 @@ from plex.model import ModelSetting as PlexModelSetting
 from plex.logic_normal import LogicNormal as PlexLogicNormal
 from plex.logic import Logic as PlexLogic
 
-from .models import ModelWatchTargetItem as ModelItem
+from .models import ModelWatchTargetItem as WatchItem
 from .models import ModelScanItem as ScanItem
 
 #########################################################
@@ -59,6 +60,7 @@ class GdsManager(LogicModuleBase):
         'except_paths': '',
     }
 
+
     def __init__(self, P):
         super(GdsManager, self).__init__(P, 'browser')
         self.name = 'base'
@@ -80,6 +82,9 @@ class GdsManager(LogicModuleBase):
         self.gds_creds = None
         self.except_paths = []
 
+        self.FullScanQueue = None
+        self.FullScanThread = None
+
     def plugin_load(self):
         self.dir_cache = json.loads(ModelSetting.get('gds_dir_cache'))
         logger.debug('load dircache: '+str(len(self.dir_cache))+ ' item(s) loaded')
@@ -89,6 +94,12 @@ class GdsManager(LogicModuleBase):
         self.gds_auth_status = self.gds_auth_init()
         self.fullscan_interval = ModelSetting.get_int('fullscan_interval')
         self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
+
+        if self.FullScanQueue == None: self.FullScanQueue = py_queue.Queue()
+        if self.FullScanThread == None:
+            self.FullScanThread = threading.Thread(target=self.fullscan_thread_function, args=())
+            self.FullScanThread.daemon = True
+            self.FullScanThread.start()
 
     def plugin_unload(self):
         logger.debug('dump dircache: '+str(len(self.dir_cache))+' item(s) dumped')
@@ -133,6 +144,9 @@ class GdsManager(LogicModuleBase):
             name = self.name
             arg['sub'] = name
             arg['proxy_url'] = ToolUtil.make_apikey_url(f'/{package_name}/api/{name}/proxy')
+            arg['proxy_subtitle_url'] = ToolUtil.make_apikey_url(f'/{package_name}/api/{name}/proxy')
+            #arg['proxy_url'] = ToolUtil.make_apikey_url(f'/system/api/gds')
+            #arg['proxy_subtitle_url'] = ToolUtil.make_apikey_url(f'/system/api/gds_subtitle')
 
             if sub == 'setting':
                 arg['scheduler'] = str(scheduler.is_include(self.get_scheduler_name()))
@@ -177,7 +191,7 @@ class GdsManager(LogicModuleBase):
                 self.dir_cache.clear()
                 ret['msg'] = '디렉토리 캐시를 초기화하였습니다.'
             elif sub == 'web_list':
-                return ModelItem.web_list(req)
+                return WatchItem.web_list(req)
             elif sub == 'scan_list':
                 return ScanItem.web_list(req)
             elif sub == 'register_watch':
@@ -194,6 +208,8 @@ class GdsManager(LogicModuleBase):
                 ret = self.refresh_vfs(req)
             elif sub == 'send_scan':
                 ret = self.send_scan(req)
+            elif sub == 'refresh_meta':
+                ret = self.refresh_meta(req)
             elif sub == 'one_execute':
                 ret = self.one_execute(req)
             elif sub == 'execute_reset':
@@ -256,6 +272,7 @@ class GdsManager(LogicModuleBase):
                     else:
                         text = r.text
                     vtt = self.srt2vtt(text)
+                    #vtt = convSrt2Vtt(text)
                     r.headers['Content-Type'] = "text/vtt; charset=utf-8"
                     r.headers['Content-Disposition'] = f'inline; filename="subtitle.vtt"'
                     r.headers['Content-Transfer-Encoding'] = 'binary'
@@ -530,7 +547,7 @@ class GdsManager(LogicModuleBase):
             scheduled = True if req.form['scheduled'] == 'True' else False
             
             entity = None
-            entity = ModelItem(remote_path, folder_id, media_type, depth, onair, scheduled)
+            entity = WatchItem(remote_path, folder_id, media_type, depth, onair, scheduled)
             if not entity:
                 return {'ret':'error', 'msg':f'failed to initialize WatchTargetItem:{remote_path}'}
 
@@ -556,7 +573,7 @@ class GdsManager(LogicModuleBase):
             scheduled = True if req.form['scheduled'] == 'True' else False
             
             entity = None
-            entity = ModelItem.get_by_id(db_id)
+            entity = WatchItem.get_by_id(db_id)
             if not entity:
                 return {'ret':'error', 'msg':f'데이터를 찾을 수 없습니다:(ID:{db_id})'}
 
@@ -598,7 +615,7 @@ class GdsManager(LogicModuleBase):
         try:
             db_id = int(req.form['db_id'])
             entity = None
-            entity = ModelItem.get_by_id(db_id)
+            entity = WatchItem.get_by_id(db_id)
             if not entity:
                 return {'ret':'error', 'msg':f'대상을 찾을 수 없습니다.(ID:{id}'}
 
@@ -791,6 +808,105 @@ class GdsManager(LogicModuleBase):
             logger.error(traceback.format_exc())
             return {'ret':'error', 'msg':str(e)}
 
+    def get_program_metadata_id(self, meta_id, sub_type=None):
+        try:
+            for i in range(4):
+                query = f'SELECT id,parent_id,metadata_type from metadata_items where id="{meta_id}"'
+                ret = PlexLogicNormal.execute_query(query)
+                if ret['ret'] != True: return None
+                mid, pid, mtype = ret['data'][0].split('|')
+                if sub_type != None and sub_type == 'season':
+                    if mtype == '3':
+                        meta_id = mid
+                        break
+                if mtype == '2':
+                    meta_id = mid
+                    break
+
+                meta_id = pid
+            target = '시즌' if sub_type == 'season' else '프로그램'
+            logger.debug(f'{target} 메타데이터ID: {meta_id}')
+            return meta_id
+
+        except Exception as e:
+            logger.debug('Exception:%s', e)
+            logger.debug(traceback.format_exc())
+            return None
+
+    def refresh_meta(self, req):
+        try:
+            #logger.debug(req.form)
+            remote_path = req.form['remote_path']
+            folder_id = req.form['folder_id'] if 'folder_id' in req.form else '-'
+            db_id = int(req.form['db_id']) if 'db_id' in req.form else -1
+            mtype = req.form['mtype']
+            target = req.form['target_meta']
+            logger.debug(f'메타데이터 갱신요청: {remote_path},{folder_id},{mtype},{target}')
+
+            # 파일을 지정하여 갱신요청한 경우
+            if target == 'file' and mtype.startswith('video/'):
+                plex_path = self.get_plex_path(remote_path)
+                if not PlexLogicNormal.metadata_refresh(filepath=plex_path):
+                    logger.error(f'메타데이터 갱신 실패: {plex_path}')
+                    return {'ret':'error', 'msg':f'메타데이터 갱신 실패: {remote_path}'}
+                logger.debug(f'메타데이터 갱신 요청 완료: {plex_path}')
+                return {'ret':'success', 'msg':f'메타데이터 갱신요청 완료: {remote_path}'}
+
+            if mtype.endswith('folder'):
+                if remote_path not in self.dir_cache:
+                    logger.error(f'메타데이터 갱신 실패: 잘못된 경로/캐시없음({remote_path})')
+                    return {'ret':'error', 'msg':f'메타갱신 실패: 잘못된 경로/캐시없음({remote_path})'}
+                children = self.dir_cache[remote_path]['cache']
+                found = False
+                for child in children:
+                    if child['name'] == '..': continue
+                    if child['mimeType'].startswith('video/'):
+                        found = True
+                        break
+
+                if not found:
+                    logger.error(f'메타데이터 갱신 실패: 잘못된 경로/상위폴더미지원({remote_path})')
+                    return {'ret':'error', 'msg':f'메타갱신 실패: 잘못된 경로/상위폴더미지원({remote_path})'}
+
+                remote_path = remote_path + '/' + child['name']
+
+            plex_path = self.get_plex_path(remote_path)
+            # 영화의 경우: 부모폴더를 지정하여 메타고침한 케이스
+            if target == 'file':
+                if not PlexLogicNormal.metadata_refresh(filepath=plex_path):
+                    logger.error(f'메타데이터 갱신 실패: 잘못된 경로({plex_path})')
+                    return {'ret':'error', 'msg':f'메타데이터 갱신 실패: {remote_path}'}
+                logger.debug(f'메타데이터 갱신요청 완료:  {plex_path}')
+                return {'ret':'success', 'msg':f'메타데이터 갱신요청 완료: {remote_path}'}
+
+            logger.debug(f'메타조회 시도: {remote_path},{plex_path}')
+            # 쇼의 경우
+            try:
+                metadata_id = PlexLogicNormal.get_library_key_using_bundle(plex_path)
+                if metadata_id == None or metadata_id == '':
+                    logger.error(f'메타데이터ID 조회 실패: {plex_path}')
+                    return {'ret':'error', 'msg':f'메타갱신 실패: 메타데이터ID 획득 실패({remote_path})'}
+            except:
+                logger.error(f'메타데이터ID 조회 실패: {plex_path}')
+                return {'ret':'error', 'msg':f'메타갱신 실패: 메타데이터ID를 획득 실패({remote_path})'}
+
+            sub_type = 'season' if target == 'season' else None
+            target_metadata_id = self.get_program_metadata_id(metadata_id, sub_type=sub_type)
+            if target_metadata_id == None:
+                logger.error(f'{target.upper()} 메타데이터ID 조회 실패: {plex_path}')
+                return {'ret':'error', 'msg':f'메타갱신 실패: 메타데이터ID를 획득 실패({remote_path})'}
+
+            logger.debug(f'메타데이터 갱신요청: {plex_path},{target.upper()},{target_metadata_id}')
+            if not PlexLogicNormal.metadata_refresh(metadata_id=target_metadata_id):
+                logger.error(f'메타데이터 갱신실패: {plex_path},{target.upper()},{target_metadata_id}')
+                return {'ret':'error', 'msg':f'메타데이터 갱신 실패: {remote_path}'}
+            logger.debug(f'메타데이터 갱신요청 완료: {plex_path},{target.upper()},{target_metadata_id}')
+            return {'ret':'success', 'msg':f'메타데이터 갱신요청 완료: {remote_path}'}
+        except Exception as e:
+            logger.error('Exception:%s', e)
+            logger.error(traceback.format_exc())
+            return {'ret':'error', 'msg':str(e)}
+
     def srt2vtt(self, srt):
         try:
             logger.debug('convert srt to vtt')
@@ -842,7 +958,7 @@ class GdsManager(LogicModuleBase):
     def task(self):
         try:
             logger.debug('스케쥴러 시작')
-            entities = ModelItem.get_scheduled_entities()
+            entities = WatchItem.get_scheduled_entities()
             total = len(entities)
             logger.debug('감시대상 폴더: %d', total)
             if total != 0 and self.gds_auth():
@@ -870,11 +986,17 @@ class GdsManager(LogicModuleBase):
 
                     if self.is_fullscan_target(entity.last_fullscan_time):
                         logger.debug(f'감시대상 전체스캔: {entity.remote_path}')
-                        ret = self.send_scan(None, watch=entity)
-                        if ret['ret'] == 'success':
-                            entity.last_updated_time = now
-                            entity.last_fullscan_time = now
-                            entity.save()
+
+                        def func():
+                            self.vfs_refresh_thread(entity.id)
+
+                        thread = threading.Thread(target=func, args=())
+                        thread.setDaemon(True)
+                        thread.start()
+
+                        entity.last_updated_time = now
+                        entity.last_fullscan_time = now
+                        entity.save()
                         continue
 
                     target_parents = [x for x in subfolders.keys()]
@@ -950,6 +1072,12 @@ class GdsManager(LogicModuleBase):
                                 if ret['ret'] != 'success':
                                     logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
                                     continue
+                            else:
+                                if not PlexLogicNormal.os_path_exists(plex_path):
+                                    ret = self.gds_vfs_refresh(ppath)
+                                    if ret['ret'] != 'success':
+                                        logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
+                                        continue
 
                         rname, rpath = sub_remote_path.split(':', maxsplit=1)
                         scan_folder_id = parent_id if mtype == 'video' else child['id']
@@ -963,7 +1091,6 @@ class GdsManager(LogicModuleBase):
                             logger.error(f'처리[{curr}/{nchildren}]: 스캔명령 전송 실패({plex_path})')
                             continue
 
-                        # 
                         scan_item.status = 'scan_sent'
                         scan_item.updated_time = now
                         scan_item.save()
@@ -1031,7 +1158,7 @@ class GdsManager(LogicModuleBase):
             return None
 
     def get_watch_pathes(self):
-        pathes = list(set([x.remote_path for x in ModelItem.get_all_entities()]))
+        pathes = list(set([x.remote_path for x in WatchItem.get_all_entities()]))
         return '|'.join(pathes)
 
     def get_rc_path(self, plex_path):
@@ -1061,7 +1188,9 @@ class GdsManager(LogicModuleBase):
 
             command.append(f'dir={rc_path}')
             if _async: command.append('_async=true')
-            if recursive: command.append('recursive=true')
+            if recursive:
+                command.append('recursive=true')
+                command.append('--fast-list')
             logger.debug(command)
             ret = SystemLogicCommand.execute_command_return(command, format='json')
             logger.debug(ret)
@@ -1071,12 +1200,12 @@ class GdsManager(LogicModuleBase):
             if _async: # async
                 if 'jobid' not in ret:
                     return {'ret':'error', 'msg':f'마운트 경로({rc_path}) 갱신이 실패하였습니다.(mount rc확인필요)'}
-                return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({ret["jobid"]}:{rc_path})'}
+                return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({ret["jobid"]}:{rc_path})', 'jobid':ret['jobid']}
 
             # direct
             if ret['result'][rc_path] != 'OK':
                 return {'ret':'error', 'msg':f'마운트 경로({rc_path}) 갱신이 실패하였습니다.(mount rc확인필요)'}
-            return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})'}
+            return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})', 'jobid':ret['jobid']}
 
         except Exception as e:
             logger.error('Exception:%s', e)
@@ -1088,7 +1217,7 @@ class GdsManager(LogicModuleBase):
             str_target = '감시대상목록' if target == 'watch' else '스캔내역목록'
             logger.debug(f'모든 항목 삭제: 삭제대상({str_target})')
             if target == 'watch':
-                db.session.query(ModelItem).delete()
+                db.session.query(WatchItem).delete()
                 db.session.commit()
             else:
                 db.session.query(ScanItem).delete()
@@ -1103,7 +1232,7 @@ class GdsManager(LogicModuleBase):
     def one_execute(self, req):
         try:
             db_id = int(req.form['db_id'])
-            entity = ModelItem.get_by_id(db_id)
+            entity = WatchItem.get_by_id(db_id)
             if entity == None:
                 return {'ret':'error', 'msg':f'잘못된 id입니다.{db_id}'}
 
@@ -1305,6 +1434,128 @@ class GdsManager(LogicModuleBase):
             if fnmatch(path, ex):
                 return True
         return False
+
+    def check_rc_job_completed(self, jobid):
+        try:
+            count = 0
+            command = ['rclone', 'rc', '--json']
+            job = {"jobid":f'{jobid}'}
+            command.append(json.dumps(job))
+            command.append('job/status')
+            command.append('--rc-addr')
+            command.append(ModelSetting.get('gds_rc_addr'))
+            if ModelSetting.get_bool('gds_use_rc_auth'):
+                command.append('--rc-user')
+                command.append(ModelSetting.get('gds_rc_user'))
+                command.append('--rc-pass')
+                command.append(ModelSetting.get('gds_rc_pass'))
+
+            while True:
+                time.sleep(10)
+                ret = SystemLogicCommand.execute_command_return(command, format='json')
+                logger.debug(ret)
+                if ret['finished'] or count > 30:
+                    break
+                logger.debug(f'jobid({jobid}) 작업 진행중(1분후 재확인)')
+                time.sleep(50)
+                count = count + 1
+
+            return ret['success']
+        except Exception as e:
+            logger.debug('Exception:%s', e)
+            logger.debug(traceback.format_exc())
+            return False
+
+
+    def vfs_refresh_thread(self, db_id):
+        try:
+            logger.debug(f'[전체스캔] rclone 캐시 갱신: id({db_id})')
+            entity = WatchItem.get_by_id(db_id)
+            plex_path = self.get_plex_path(entity.remote_path)
+            ret = self.gds_vfs_refresh(plex_path, _async=True, recursive=True)
+            if ret['ret'] != 'success':
+                logger.error(f'[전체스캔] vfs/refresh 전송 실패:{plex_path}')
+                self.FullScanQueue.task_done()
+                return
+
+            jobid = ret['jobid']
+            logger.debug(f'[전체스캔] rclone 캐시 갱신요청 완료:{plex_path},{jobid}')
+            success = self.check_rc_job_completed(jobid)
+            if success:
+                logger.debug(f'[전체스캔] rclone 캐시 갱신처리 완료: {plex_path}')
+                req = {'id': db_id}
+                self.FullScanQueue.put(req)
+            else:
+                logger.debug(f'[전체스캔] rclone 캐시 갱신처리 실패: {plex_path})')
+
+        except Exception as e:
+            logger.debug('Exception:%s', e)
+            logger.debug(traceback.format_exc())
+            return
+
+    def fullscan_thread_function(self):
+        logger.debug('[전체스캔] 전체경로 스캔 쓰레드 시작')
+        while True:
+            try:
+                req = self.FullScanQueue.get()
+                logger.debug(req)
+                db_id = req['id']
+                entity = WatchItem.get_by_id(db_id)
+
+                remote_path = entity.remote_path
+                folder_id = entity.folder_id
+                plex_path = self.get_plex_path(remote_path)
+
+                scan_list = []
+                logger.debug(f'[전체스캔] 스캔 전송 시작: {plex_path}')
+                section_id = PlexLogicNormal.get_section_id_by_filepath(plex_path)
+                if section_id == -1:
+                    found = False
+                    server_url = PlexModelSetting.get('server_url')
+                    server_token = PlexModelSetting.get('server_token')
+                    cmd = 'get_setcion'
+                    url = '%s/:/plugins/com.plexapp.plugins.SJVA/function/command?cmd=%s&param1=%s&param2=%s&X-Plex-Token=%s' % (server_url, cmd, '', '', server_token)
+                    #logger.debug(url)
+                    request = py_urllib2.Request(url)
+                    response = py_urllib2.urlopen(request)
+                    data = response.read()
+                    data = json.loads(data)
+                    for item in data['data']:
+                        if item['location'].startswith(plex_path):
+                            found = True
+                            scan_list.append({'id':item['id'], 'location':item['location']})
+
+                    if not found:
+                        logger.error('[전체스캔] Plex에 경로를 추가해주세요({plex_path})')
+                        self.FullScanQueue.task_done()
+                        continue
+
+                    tmp = remote_path.split(':', maxsplit=1)
+                    scan_item = ScanItem(entity.id, tmp[0], tmp[1], folder_id, folder_id, plex_path)
+                    scan_item.save()
+
+                    for s in scan_list:
+                        lpath = s['location']
+                        sid = int(s['id'])
+                        if not self.plex_send_scan(lpath, section_id=sid, callback_id=scan_item.id):
+                            logger.error(f'[전체스캔] 스캔명령 전송 실패: {lpath}({sid})')
+                            continue
+                else:
+                    tmp = remote_path.split(':', maxsplit=1)
+                    scan_item = ScanItem(entity.id, tmp[0], tmp[1], entity.folder_id, entity.folder_id, plex_path)
+                    scan_item.save()
+                    if not self.plex_send_scan(plex_path, section_id=section_id, callback_id=scan_item.id):
+                        logger.error(f'[전체스캔] 스캔명령 전송 실패: {lpath}({sid})')
+                        continue
+    
+                scan_item.status = 'scan_sent'
+                scan_item.save()
+                self.FullScanQueue.task_done()
+                logger.debug(f'[전체스캔] 스캔 전송 완료: {plex_path}')
+
+            except Exception as e:
+                logger.debug('Exception:%s', e)
+                logger.debug(traceback.format_exc())
 
     @staticmethod
     def send_noti(scan_id, filename=None):

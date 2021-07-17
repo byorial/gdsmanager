@@ -62,6 +62,7 @@
 var package_name = "{{arg['package_name'] }}";
 var sub = "{{arg['sub'] }}";
 var proxy_url = "{{arg['proxy_url'] }}";
+var proxy_subtitle_url = "{{arg['proxy_subtitle_url'] }}";
 var remote_str = "{{arg['remote_names'] }}";
 var default_remote = "{{arg['gdproxy_remote_name'] }}"
 var remote_names = remote_str.split('|');
@@ -87,9 +88,9 @@ $(document).ready(function(){
     selector: '.usectx',
     trigger: 'right',
     callback: function(key, options) {
-      var mtype = options.$trigger.attr('mtype');
-      var folder_id = options.$trigger.attr('folder_id');
-      var name = options.$trigger.attr('name');
+      var mtype = $(this).attr('mtype');
+      var folder_id = $(this).attr('folder_id');
+      var name = $(this).attr('name');
       if (key == 'watch') {
 	add_watch(mtype, name, folder_id);
       } else if (key == 'copypath') {
@@ -110,14 +111,16 @@ $(document).ready(function(){
 	refresh_vfs(mtype, name, folder_id);
       } else if (key == 'scan') {
 	send_scan(mtype, name, folder_id);
+      } else if (key == 'file_refresh' || key == 'season_refresh' || key == 'program_refresh') {
+	refresh_meta(mtype, name, folder_id, key);
       }
     },
     items: {
         "watch": {
 	  name: "감시대상에 추가", icon: "fa-plus", 
 	  disabled: function(key, options) {
-	    if (options.$trigger.attr('mtype') == 'application/vnd.google-apps.folder') {
-	      remote_path = curr_remote + ':' + curr_path + '/' + options.$trigger.attr('name');
+	    if ($(this).attr('mtype') == 'application/vnd.google-apps.folder') {
+	      remote_path = curr_remote + ':' + curr_path + '/' + $(this).attr('name');
 	      if (is_watched(remote_path)) {
 		return true;
 	      } else {
@@ -130,7 +133,7 @@ $(document).ready(function(){
 	},
         "copypath": {name: "경로복사", icon: "fa-copy",
 	  disabled: function(key, options) {
-	    if (options.$trigger.attr('name') == '..') {
+	    if ($(this).attr('name') == '..') {
 	      return true;
 	    } else {
               return false;
@@ -139,7 +142,7 @@ $(document).ready(function(){
 	},
         "refresh": {name: "마운트캐시갱신", icon: "fa-refresh",
 	  disabled: function(key, options) {
-	    if (options.$trigger.attr('name') == '..') {
+	    if ($(this).attr('name') == '..') {
 	      return true;
 	    } else {
               return false;
@@ -148,14 +151,48 @@ $(document).ready(function(){
 	},
         "scan": {name: "스캔명령 전송", icon: "fa-share",
 	  disabled: function(key, options) {
-	    if (options.$trigger.attr('name') == '..') {
+	    if ($(this).attr('name') == '..') {
 	      return true;
 	    } else {
               return false;
 	    }
 	  }
 	},
-    }
+        "meta": {name: "메타데이터 갱신", icon: "fa-pencil-square-o",
+	  disabled: function(key, options) {
+	    if ($(this).data('name') == '..') {
+	      return true;
+	    } else if ($(this).attr('mtype').startsWith('video/')) {
+              return false;
+	    } else if ($(this).attr('mtype').endsWith('folder')) {
+              return false;
+	    } else {
+              return true;
+	    }
+	  },
+	  items: {
+           "file_refresh": {"name": "영화/에피 메타 갱신"},
+           "season_refresh": {"name": "시즌 메타 갱신",
+              disabled: function(key, options) {
+		if (curr_path.startsWith('/영화')) {
+	          return true;
+	        } else {
+                  return false;
+	        }
+	      }
+	   },
+           "program_refresh": {"name": "프로그램 메타 갱신",
+              disabled: function(key, options) {
+		if (curr_path.startsWith('/영화')) {
+	          return true;
+	        } else {
+                  return false;
+	        }
+	      },
+	    }
+	  }
+	},
+     }
   });
 });
 
@@ -363,6 +400,7 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
 function play_video(fname, fileid, mtype) {
   var str = '';
   var video_url = proxy_url + ((proxy_url.indexOf('?') == -1) ? '?' : '&') + 'f=' + fileid + '&r=' +curr_remote;
+  //var video_url = proxy_url + ((proxy_url.indexOf('?') == -1) ? '?' : '&') + 'id=' + fileid;
   var vr_projection = document.getElementById('vr_projection').value;
 
   var form = document.playform;
@@ -385,7 +423,8 @@ function play_video(fname, fileid, mtype) {
 
   console.log(subtitle_fileid);
   if (subtitle_fileid != "nosub") {
-    var subtitle_url = proxy_url + ((proxy_url.indexOf('?') == -1) ? '?' : '&') + 'f=' + subtitle_fileid + '&r=' +curr_remote +'&k=subtitle';
+    var subtitle_url = proxy_subtitle_url + ((proxy_subtitle_url.indexOf('?') == -1) ? '?' : '&') + 'f=' + subtitle_fileid + '&r=' +curr_remote +'&k=subtitle';
+    //var subtitle_url = proxy_subtitle_url + ((proxy_subtitle_url.indexOf('?') == -1) ? '?' : '&') + 'id=' + subtitle_fileid;
     $('#play_subtitle_src').val(subtitle_url);
     subtitle_fileid = "nosub";
     console.log(subtitle_fileid)
@@ -484,7 +523,6 @@ function refresh_vfs(mtype, name, folder_id) {
   });
 }
 
-
 function send_scan(mtype, name, folder_id) {
   if (mtype != 'application/vnd.google-apps.folder') { // file
     var target_folder_id = curr_folder_id;
@@ -498,6 +536,26 @@ function send_scan(mtype, name, folder_id) {
     type: 'POST',
     cache: false,
     data: {remote_path:target_remote, folder_id:target_folder_id},
+    dataType: 'json',
+    success: function (data) {
+      if (data.ret == 'success') {
+	$.notify('<strong>성공: '+data.msg+'</strong>', {type: 'success'});
+      } else {
+	$.notify('<strong>실패: '+data.msg+'</strong>', {type: 'warning'});
+      }
+    }
+  });
+}
+
+function refresh_meta(mtype, name, folder_id, key) {
+  var target_folder_id = curr_folder_id;
+  var target_remote = curr_remote + ':' + curr_path + '/' + name;
+  var target_meta = key.split('_')[0];
+  $.ajax({
+    url: '/'+package_name+'/ajax/'+sub+'/refresh_meta',
+    type: 'POST',
+    cache: false,
+    data: {remote_path:target_remote, folder_id:target_folder_id, mtype:mtype, target_meta:target_meta},
     dataType: 'json',
     success: function (data) {
       if (data.ret == 'success') {

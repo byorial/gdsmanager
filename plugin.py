@@ -24,17 +24,20 @@ class P(object):
     menu = {
         'main' : [package_name, '구드공관리'],
         'sub' : [
-            ['base', '구드공관리'],['log', '로그']
+            ['base', '구드공관리'],['manual','메뉴얼'],['log', '로그']
         ],
         'category' : 'service',
         'sub2' : {
             'base': [
                 ['setting','설정'],['browser', '탐색'],['watch', '감시대상목록'],['scan','스캔목록']
             ],
+            'manual': [
+                ['manual/changelog.md','변경내역'],['README.md', '메뉴얼']
+            ],
         },
     }
     plugin_info = {
-        'version' : '0.1.0.5',
+        'version' : '0.1.1.0',
         'name' : package_name,
         'category_name' : 'service',
         'icon' : '',
