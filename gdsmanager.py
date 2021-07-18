@@ -1205,7 +1205,11 @@ class GdsManager(LogicModuleBase):
             # direct
             if ret['result'][rc_path] != 'OK':
                 return {'ret':'error', 'msg':f'마운트 경로({rc_path}) 갱신이 실패하였습니다.(mount rc확인필요)'}
-            return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})', 'jobid':ret['jobid']}
+
+            if _async:
+                return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})', 'jobid':ret['jobid']}
+            else
+                return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})'}
 
         except Exception as e:
             logger.error('Exception:%s', e)
