@@ -1208,7 +1208,7 @@ class GdsManager(LogicModuleBase):
 
             if _async:
                 return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})', 'jobid':ret['jobid']}
-            else
+            else:
                 return {'ret':'success', 'msg':f'VFS/REFRESH 요청완료({rc_path})'}
 
         except Exception as e:
