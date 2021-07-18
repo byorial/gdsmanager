@@ -66,13 +66,14 @@ var proxy_subtitle_url = "{{arg['proxy_subtitle_url'] }}";
 var remote_str = "{{arg['remote_names'] }}";
 var default_remote = "{{arg['gdproxy_remote_name'] }}"
 var remote_names = remote_str.split('|');
-var curr_remote = "{{arg['last_remote']}}"
-var curr_folder_id = "{{arg['last_folderid']}}"
-var curr_path = "{{arg['last_path']}}"
+var curr_remote = "{{arg['last_remote']}}";
+var curr_folder_id = "{{arg['last_folderid']}}";
+var curr_path = "{{arg['last_path']}}";
 var subtitle_fileid = "nosub";
-var gds_remote = "{{arg['gds_remote_name']}}"
-var str_watch_pathes = "{{arg['watch_pathes']}}"
+var gds_remote = "{{arg['gds_remote_name']}}";
+var str_watch_pathes = "{{arg['watch_pathes']}}";
 var watch_pathes = str_watch_pathes.split('|');
+var theme = "{{arg['theme']}}";
  
 $(document).ready(function(){
   if (watch_pathes[0] == "") {
@@ -80,6 +81,7 @@ $(document).ready(function(){
   }
   set_remote_options();
   set_projection_options();
+  set_except_css();
   if (curr_path != '' && curr_folder_id != '' && curr_path != '') {
     $('#current_path').val(curr_path);
     listgdrive(curr_remote, curr_path, curr_folder_id);
@@ -250,6 +252,15 @@ function set_projection_options() {
   }
   str += '</select>';
   document.getElementById("projection_options_span").innerHTML = str;
+}
+
+function set_except_css() {
+  if (theme == 'Default') {
+    var styleEl = document.createElement('style'), styleSheet;
+    document.head.appendChild(styleEl);
+    styleSheet = styleEl.sheet;
+    styleSheet.insertRule(".list-group-horizontal { -webkit-box-orient: horizontal; -webkit-box-direction: normal; -ms-flex-direction: row; flex-direction: row;}", 0);
+  }
 }
 
 $("body").on('click', '#reset_cache_btn', function(e) {

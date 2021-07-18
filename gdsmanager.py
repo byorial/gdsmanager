@@ -153,6 +153,7 @@ class GdsManager(LogicModuleBase):
                 arg['is_running'] = str(scheduler.is_running(self.get_scheduler_name()))
             elif sub == 'browser':
                 arg['remote_names'] = '|'.join(self.get_remote_names())
+                arg['theme'] = SystemModelSetting.get('theme')
                 # 타겟 폴더 지정하여 로드
                 if 'remote_name' in req.form and 'remote_path' in req.form and 'folder_id' in req.form:
                     #logger.debug(f'{req.form["remote_name"]},{req.form["remote_path"]},{req.form["folder_id"]}')
