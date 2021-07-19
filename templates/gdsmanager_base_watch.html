@@ -95,6 +95,7 @@ $("#reset_btn").click(function(e) {
 
 function request_search(page, scroll) {
   formData = get_formdata('#form_search');
+  formData += '&page='+page;
   current_page = page;
   $.ajax({
     url: '/' + package_name + '/ajax/'+sub+'/web_list',
