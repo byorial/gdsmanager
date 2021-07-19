@@ -8,17 +8,22 @@
       <div class="row show-grid" align="center">
         <span class="col-md-12" align="left">
          <span class="col-md-3">
-           <select name='order'>
+           <select id='order' name='order' class='form-control form-control-sm'>
              <option value="ctime_desc" selected>등록역순</option>
              <option value="ctime_asc">등록순</option>
              <option value="mtime_desc">갱신역순</option>
              <option value="mtime_asc">갱신순</option>
            </select>
+           <select id='status' name='status' class='form-control form-control-sm'>
+             <option value="all" selected>전체</option>
+             <option value="created">스캔생성</option>
+             <option value="scan_sent">스캔요청</option>
+             <option value="completed">스캔완료</option>
+	     <option value="skipped">미사용</option>
+           </select>
 	 </span>
-         <span class="col-md-7">
-	  <input id="search_word" name="search_word" class="form-control form-control-sm w-75" type="text" placeholder="경로/폴더ID" aria-label="Search">
-	 </span>
-         <span class="col-md-2">
+         <span class="col-md-8">
+	  <input id="search_word" name="search_word" class="form-control form-control-sm w-50" type="text" placeholder="경로/폴더ID" aria-label="Search">
           {{ macros.m_button_group([['search', '검색'], ['reset_btn', '리셋']]) }}
          </span>
         </span>
@@ -119,11 +124,13 @@ function make_list(data) {
 
     var str_status = '-';
     if (data[i].status == 'created') {
-      str_status = '생성'
+      str_status = '스캔생성'
     } else if (data[i].status == 'scan_sent') {
       str_status = '스캔요청'
     } else if (data[i].status == 'completed') {
       str_status = '스캔완료'
+    } else if (data[i].status == 'skipped') {
+      str_status = '미사용'
     }
     str += m_col(1, str_status);
     btn_str = '';
@@ -214,6 +221,14 @@ function delete_scan(db_id) {
     }
   });
 }
+
+$("body").on('change', '#order', function(e){
+  request_search(current_page, true);
+});
+
+$("body").on('change', '#status', function(e){
+  request_search(current_page, true);
+});
 
 </script>    
 {% endblock %}

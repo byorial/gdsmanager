@@ -221,14 +221,18 @@ class ModelScanItem(db.Model):
             page = 1
             page_size = 30
             search = ''
-            order='ctime_desc'
+            order = 'ctime_desc'
+            status = 'all'
+
             if 'page' in req.form:
                 page = int(req.form['page'])
             if 'search_word' in req.form:
                 search = req.form['search_word']
             if 'order' in req.form:
                 order = req.form['order']
-            query = cls.make_query(search=search, order=order)
+            if 'status' in req.form:
+                status = req.form['status']
+            query = cls.make_query(search=search, order=order, status=status)
             count = query.count()
             query = query.limit(page_size).offset((page-1)*page_size)
             #logger.debug('cls count:%s', count)
@@ -242,7 +246,7 @@ class ModelScanItem(db.Model):
 
 
     @classmethod
-    def make_query(cls, search='', order='ctime_desc'):
+    def make_query(cls, search='', order='ctime_desc', status='all'):
         query = db.session.query(cls)
         if search is not None and search != '':
             if search.find('|') != -1:
@@ -263,6 +267,9 @@ class ModelScanItem(db.Model):
                         query = query.filter(or_(*conditions))
             else:
                 query = query.filter(or_(cls.remote_path.like('%'+search+'%'), cls.folder_id.like('%'+search+'%')))
+
+        if status != 'all':
+            query = query.filter_by(status=status)
 
         if order == 'ctime_desc':
             query = query.order_by(desc(cls.created_time))

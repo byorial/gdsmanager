@@ -783,7 +783,7 @@ class GdsManager(LogicModuleBase):
                         logger.error(f'failed to send plex scan: {ppath}({sid})')
                         return {'ret':'error', 'msg':f'plex scan 전송 실패:{ppath}({sid})'}
 
-                scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'created'
+                scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'skipped'
                 scan_item.save()
                 logger.debug(f'send_scan: END:{remote_path}')
                 return {'ret':'success', 'msg':f'완료: {remote_path}'}
@@ -799,7 +799,7 @@ class GdsManager(LogicModuleBase):
                 logger.error(f'failed to send plex scan: {plex_path}')
                 return {'ret':'error', 'msg':f'plex scan 전송 실패:{plex_path}'}
 
-            scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'created'
+            scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'skipped'
             scan_item.save()
             logger.debug(f'send_scan: END:{remote_path}')
             return {'ret':'success', 'msg':f'완료: {remote_path}'}
@@ -1126,11 +1126,11 @@ class GdsManager(LogicModuleBase):
                             logger.error(f'처리[{curr}/{nchildren}]: 스캔명령 전송 실패({plex_path})')
                             continue
 
-                        scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'created'
+                        scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'skipped'
                         scan_item.updated_time = now
                         scan_item.save()
 
-                        logger.debug(f'처리[{curr}/{nchildren}]: 스캔명령 전송 완료({plex_path})')
+                        logger.debug(f'처리[{curr}/{nchildren}]: 스캔명령 ({scan_item.status}:{plex_path})')
 
                     entity.subfolders = json.dumps(subfolders)
                     entity.last_updated_time = now
@@ -1385,11 +1385,11 @@ class GdsManager(LogicModuleBase):
                     logger.error(f'처리[{curr}/{nchildren}]: 스캔명령 전송 실패({plex_path})')
                     continue
 
-                scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'created'
+                scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'skipped'
                 scan_item.updated_time = now
                 scan_item.save()
 
-                logger.debug(f'처리[{curr}/{nchildren}]: 스캔명령 전송 완료({plex_path})')
+                logger.debug(f'처리[{curr}/{nchildren}]: 스캔명령 ({scan_item.status}:{plex_path})')
 
             entity.subfolders = json.dumps(subfolders)
             entity.last_updated_time = now
@@ -1588,7 +1588,7 @@ class GdsManager(LogicModuleBase):
                         logger.error(f'[전체스캔] 스캔명령 전송 실패: {lpath}({sid})')
                         continue
     
-                scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'created'
+                scan_item.status = 'scan_sent' if ModelSetting.get_bool('use_plex_scan') else 'skipped'
                 scan_item.save()
                 self.FullScanQueue.task_done()
                 logger.debug(f'[전체스캔] 스캔 전송 완료: {plex_path}')

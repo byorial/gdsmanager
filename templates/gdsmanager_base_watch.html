@@ -8,17 +8,15 @@
       <div class="row show-grid" align="center">
         <span class="col-md-12" align="left">
          <span class="col-md-3">
-           <select name='order'>
+           <select id="order" name="order" class="form-control form-control-sm">
              <option value="ctime_desc">등록역순</option>
              <option value="ctime_asc">등록순</option>
              <option value="mtime_desc" selected>갱신역순</option>
              <option value="mtime_asc">갱신순</option>
            </select>
 	 </span>
-         <span class="col-md-7">
+         <span class="col-md-9">
 	  <input id="search_word" name="search_word" class="form-control form-control-sm w-75" type="text" placeholder="경로/폴더ID" aria-label="Search">
-	 </span>
-         <span class="col-md-2">
           {{ macros.m_button_group([['search', '검색'], ['reset_btn', '리셋']]) }}
          </span>
         </span>
@@ -328,6 +326,10 @@ function browse(obj) {
   form.folder_id.value = data.folder_id;
   form.submit();
 }
+
+$("body").on('change', '#order', function(e){
+  request_search(current_page, true);
+});
 
 </script>    
 {% endblock %}
