@@ -54,6 +54,7 @@ var current_page = 1;
 var current_rule = null;
 var formData = null;
 var country = 'all';
+var use_plex_scan = "{{arg['use_plex_scan']}}"
 
 $(document).ready(function(){
   request_search('1', true);
@@ -124,7 +125,10 @@ function make_list(data) {
       str_status = '스캔완료'
     }
     str += m_col(1, str_status);
-    btn_str =  m_button2('rescan_btn', '재스캔', [{'key':'idx', 'value':i }], 'info');
+    btn_str = '';
+    if (use_plex_scan == 'True') {
+      btn_str =  m_button2('rescan_btn', '재스캔', [{'key':'idx', 'value':i }], 'info');
+    }
     btn_str +=  m_button2('delete_btn', '삭제', [{'key':'id', 'value':data[i].id }], 'danger');
     tmp = m_button_group(btn_str)
     str += m_col(2, tmp);

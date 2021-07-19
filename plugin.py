@@ -29,7 +29,7 @@ class P(object):
         'category' : 'service',
         'sub2' : {
             'base': [
-                ['setting','설정'],['browser', '탐색'],['watch', '감시대상목록'],['scan','스캔목록']
+                ['setting','설정'],['browser', '탐색'],['watch', '감시대상목록'],['changes','갱신목록']
             ],
             'manual': [
                 ['manual/changelog.md','변경내역'],['README.md', '메뉴얼']
@@ -37,7 +37,7 @@ class P(object):
         },
     }
     plugin_info = {
-        'version' : '0.1.1.1',
+        'version' : '0.1.1.2',
         'name' : package_name,
         'category_name' : 'service',
         'icon' : '',

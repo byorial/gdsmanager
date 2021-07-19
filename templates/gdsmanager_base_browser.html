@@ -73,7 +73,7 @@ var subtitle_fileid = "nosub";
 var gds_remote = "{{arg['gds_remote_name']}}";
 var str_watch_pathes = "{{arg['watch_pathes']}}";
 var watch_pathes = str_watch_pathes.split('|');
-var theme = "{{arg['theme']}}";
+var use_plex_scan = "{{arg['use_plex_scan']}}"
  
 $(document).ready(function(){
   if (watch_pathes[0] == "") {
@@ -81,7 +81,6 @@ $(document).ready(function(){
   }
   set_remote_options();
   set_projection_options();
-  set_except_css();
   if (curr_path != '' && curr_folder_id != '' && curr_path != '') {
     $('#current_path').val(curr_path);
     listgdrive(curr_remote, curr_path, curr_folder_id);
@@ -153,7 +152,7 @@ $(document).ready(function(){
 	},
         "scan": {name: "스캔명령 전송", icon: "fa-share",
 	  disabled: function(key, options) {
-	    if ($(this).attr('name') == '..') {
+	    if ($(this).attr('name') == '..' || use_plex_scan == 'False') {
 	      return true;
 	    } else {
               return false;
@@ -162,7 +161,7 @@ $(document).ready(function(){
 	},
         "meta": {name: "메타데이터 갱신", icon: "fa-pencil-square-o",
 	  disabled: function(key, options) {
-	    if ($(this).data('name') == '..') {
+	    if ($(this).data('name') == '..' || use_plex_scan == 'False') {
 	      return true;
 	    } else if ($(this).attr('mtype').startsWith('video/')) {
               return false;
@@ -173,7 +172,15 @@ $(document).ready(function(){
 	    }
 	  },
 	  items: {
-           "file_refresh": {"name": "영화/에피 메타 갱신"},
+           "file_refresh": {"name": "영화/에피 메타 갱신",
+              disabled: function(key, options) {
+		if (!curr_path.startsWith('/영화') && $(this).attr('mtype').endsWith('folder')) {
+	          return true;
+	        } else {
+                  return false;
+	        }
+	      }
+	   },
            "season_refresh": {"name": "시즌 메타 갱신",
               disabled: function(key, options) {
 		if (curr_path.startsWith('/영화')) {
@@ -252,15 +259,6 @@ function set_projection_options() {
   }
   str += '</select>';
   document.getElementById("projection_options_span").innerHTML = str;
-}
-
-function set_except_css() {
-  if (theme == 'Default') {
-    var styleEl = document.createElement('style'), styleSheet;
-    document.head.appendChild(styleEl);
-    styleSheet = styleEl.sheet;
-    styleSheet.insertRule(".list-group-horizontal { -webkit-box-orient: horizontal; -webkit-box-direction: normal; -ms-flex-direction: row; flex-direction: row;}", 0);
-  }
 }
 
 $("body").on('click', '#reset_cache_btn', function(e) {

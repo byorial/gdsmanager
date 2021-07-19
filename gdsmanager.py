@@ -53,6 +53,7 @@ class GdsManager(LogicModuleBase):
         # etc
         'gds_chunk_size': '1048756',
         'gds_dir_cache_limit':'1000',
+        'use_plex_scan': 'True',
         'scan_notify': 'False',
         'daily_full_scan': 'False',
         'fullscan_interval': '0',
@@ -153,7 +154,6 @@ class GdsManager(LogicModuleBase):
                 arg['is_running'] = str(scheduler.is_running(self.get_scheduler_name()))
             elif sub == 'browser':
                 arg['remote_names'] = '|'.join(self.get_remote_names())
-                arg['theme'] = SystemModelSetting.get('theme')
                 # 타겟 폴더 지정하여 로드
                 if 'remote_name' in req.form and 'remote_path' in req.form and 'folder_id' in req.form:
                     #logger.debug(f'{req.form["remote_name"]},{req.form["remote_path"]},{req.form["folder_id"]}')
@@ -834,6 +834,51 @@ class GdsManager(LogicModuleBase):
             logger.debug(traceback.format_exc())
             return None
 
+    def get_video_path_for_refresh(self, remote_path, folder_id):
+        try:
+            if remote_path in self.dir_cache:
+                children = self.dir_cache[remote_path]['cache']
+                for child in children:
+                    if child['name'] == '..': continue
+                    if child['mimeType'].startswith('video/'):
+                        return remote_path + '/' + child['name']
+                return None
+
+            service = LibGdrive.sa_authorize_by_info(self.gds_sa_info, scopes=self.gds_scopes, impersonate=self.gds_impersonate, return_service=True)
+            if not service:
+                logger.error('failed to auth gdrive api')
+                return None
+
+            children = LibGdrive.get_children(folder_id, service=service, fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'])
+            if children == None:
+                logger.error(f'failed to get children: {folder_id}')
+                return None
+
+            schildren = sorted(children, key=(lambda x: x['name']))
+            parent_id = self.get_parent_id(remote_path, folder_id, service)
+            if remote_path.split('/')[1] != '':
+                pitem = [{'name':'..', 'mimeType':'application/vnd.google-apps.folder', 'id':parent_id, 'trashed':False, 'parents':[], 'size':'-'}]
+                schildren = pitem + schildren
+
+            # cache limit over: delete item
+            if len(self.dir_cache) == ModelSetting.get_int('gds_dir_cache_limit'):
+                del_key = sorted(self.dir_cache, key=lambda x: (self.dir_cache[x]['count']))[0]
+                logger.info(f'dir_cache limits over: delete({del_key}) from cache')
+                del(self.dir_cache[del_key])
+
+            count = 1
+            self.dir_cache[remote_path] = {'cache':schildren, 'count':count}
+            for child in children:
+                if child['name'] == '..': continue
+                if child['mimeType'].startswith('video/'):
+                    return remote_path + '/' + child['name']
+            return None
+
+        except Exception as e:
+            logger.debug('Exception:%s', e)
+            logger.debug(traceback.format_exc())
+            return None
+
     def refresh_meta(self, req):
         try:
             #logger.debug(req.form)
@@ -853,26 +898,15 @@ class GdsManager(LogicModuleBase):
                 logger.debug(f'메타데이터 갱신 요청 완료: {plex_path}')
                 return {'ret':'success', 'msg':f'메타데이터 갱신요청 완료: {remote_path}'}
 
+            file_remote_path = remote_path
             if mtype.endswith('folder'):
-                if remote_path not in self.dir_cache:
-                    logger.error(f'메타데이터 갱신 실패: 잘못된 경로/캐시없음({remote_path})')
-                    return {'ret':'error', 'msg':f'메타갱신 실패: 잘못된 경로/캐시없음({remote_path})'}
-                children = self.dir_cache[remote_path]['cache']
-                found = False
-                for child in children:
-                    if child['name'] == '..': continue
-                    if child['mimeType'].startswith('video/'):
-                        found = True
-                        break
+                file_remote_path = self.get_video_path_for_refresh(remote_path, folder_id)
+                if file_remote_path == None:
+                    logger.error(f'메타데이터 갱신 실패: 잘못된 영상파일 경로 획득 실패({remote_path})')
+                    return {'ret':'error', 'msg':f'메타갱신 실패: 잘못된 경로/영상파일경로 획득 실패({remote_path})'}
 
-                if not found:
-                    logger.error(f'메타데이터 갱신 실패: 잘못된 경로/상위폴더미지원({remote_path})')
-                    return {'ret':'error', 'msg':f'메타갱신 실패: 잘못된 경로/상위폴더미지원({remote_path})'}
-
-                remote_path = remote_path + '/' + child['name']
-
-            plex_path = self.get_plex_path(remote_path)
-            # 영화의 경우: 부모폴더를 지정하여 메타고침한 케이스
+            plex_path = self.get_plex_path(file_remote_path)
+            # 영화나 에피소드 메타 갱신 케이스
             if target == 'file':
                 if not PlexLogicNormal.metadata_refresh(filepath=plex_path):
                     logger.error(f'메타데이터 갱신 실패: 잘못된 경로({plex_path})')
@@ -880,8 +914,8 @@ class GdsManager(LogicModuleBase):
                 logger.debug(f'메타데이터 갱신요청 완료:  {plex_path}')
                 return {'ret':'success', 'msg':f'메타데이터 갱신요청 완료: {remote_path}'}
 
+            # 쇼의 경우: 시즌이나 프로그램 케이스
             logger.debug(f'메타조회 시도: {remote_path},{plex_path}')
-            # 쇼의 경우
             try:
                 metadata_id = PlexLogicNormal.get_library_key_using_bundle(plex_path)
                 if metadata_id == None or metadata_id == '':
@@ -1368,6 +1402,7 @@ class GdsManager(LogicModuleBase):
 
     def plex_send_scan(self, plex_path, callback_id=None, section_id = -1):
         try:
+            if not ModelSetting.get_bool('use_plex_scan'): return True
             logger.debug(f'스캔명령 전송: {plex_path},{callback_id}')
             if section_id == -1:
                 section_id = PlexLogicNormal.get_section_id_by_filepath(plex_path)
