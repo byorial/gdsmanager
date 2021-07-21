@@ -17,6 +17,8 @@
 * SJVA에 Plex 설정 및 연동
 * PMS(Plex Media Server)에 SJVA.bundle 최신버전 설치: [SJVA.bundle](https://github.com/soju6jan/SJVA.bundle)
 * PMS에 이치로님 mod버전 rclone 설치 및 구드공드라이브 마운트: [이치로님 rclone-mod](https://sjva.me/bbs/board.php?bo_table=manual&wr_id=5035)
+    * 플러그인에서 마운트 캐시 갱신을 위해 마운트시 rc 관련 설정 추가 필요
+* SJVA에 rclone 설치필요: tool은 자동설치됨, 아닌경우 도커 컨테이너 내부에 rclone 설치
 ---
 
 #### 적용 순서
