@@ -37,12 +37,12 @@ class P(object):
         },
     }
     plugin_info = {
-        'version' : '0.1.1.3',
+        'version' : '0.1.1.4',
         'name' : package_name,
         'category_name' : 'service',
         'icon' : '',
         'developer' : u'orial',
-        'description' : u'GDS Manger for SJVA Plugin',
+        'description' : u'구드공 바로보기 변경사항 조회 및 갱신 플러그인',
         'home' : 'https://github.com/byorial/%s' % package_name,
         'more' : '',
     }

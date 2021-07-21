@@ -86,6 +86,8 @@ class GdsManager(LogicModuleBase):
         self.FullScanQueue = None
         self.FullScanThread = None
 
+        self.scheduler_desc = '구드공 변경사항 조회 및 갱신'
+
     def plugin_load(self):
         self.dir_cache = json.loads(ModelSetting.get('gds_dir_cache'))
         logger.debug('load dircache: '+str(len(self.dir_cache))+ ' item(s) loaded')

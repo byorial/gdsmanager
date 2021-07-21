@@ -269,6 +269,7 @@ $("body").on('click', '#save_watch_btn', function(e) {
 	$.notify('<strong>실패: '+data.msg+'</strong>', {type: 'warning'});
       }
       $("#modify_watch_modal").modal('hide');
+      request_search(current_page, false);
     }
   });
 });
