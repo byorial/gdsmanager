@@ -1146,6 +1146,8 @@ class GdsManager(LogicModuleBase):
 
     def is_in_plex(self, plex_path, mtype='folder'):
         try:
+            if not ModelSetting.get_bool('use_plex_scan'):
+                return False
             ret = PlexLogicNormal.find_by_filename_part(plex_path)
             #logger.debug(ret)
             if not ret['ret']: return False
@@ -1358,7 +1360,6 @@ class GdsManager(LogicModuleBase):
                         if ret['ret'] != 'success':
                             logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
                             continue
-                        logger.debug(f'12312312pp:{plex_path}')
                         ret = self.gds_vfs_refresh(plex_path)
                         if ret['ret'] != 'success':
                             logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({plex_path})')
