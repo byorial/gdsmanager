@@ -38,6 +38,7 @@
       {{ macros.setting_button([['gds_auth_btn', '인증요청']], '구드공 사용자인증', desc=['SJVA시작시 자동로드함, sjva.me 접속 불가 등으로 인증이 안된경우에만 사용']) }}
       {{ macros.setting_checkbox('use_plex_scan', '스캔명령 전송여부', value=arg['use_plex_scan'], desc=['On: 신규아이템 확인시 Plex로 스캔명령을 전송함, Off: 스캔명령 전송안함(마운트캐시만갱신)']) }}
       {{ macros.setting_checkbox('scan_notify', '스캔완료시 알림전송', value=arg['scan_notify'], desc=['스캔완료시 알림 메시지를 전송합니다.','ID: gdsmanager_scan_completed','설정필요: 시스템-설정-알림-고급']) }}
+      {{ macros.setting_input_int('schedule_delta_min', '스케쥴링시간보정', value=arg['schedule_delta_min'], desc=['스케쥴링 조회시 보정할 시간, 분단위, 스케쥴러 작동시간에 따른 누락건 방지용','기본값:5분, 누락건이 생기면 조정, 스케쥴링 주기보다 큰값으로 설정시 스케쥴링 주기로 설정됨']) }}
       {{ macros.setting_input_int('execute_delta_min', '1회실행시간기준', value=arg['execute_delta_min'], desc=['1회실행시 조회할 시간 지정, 분단위', '60으로 지정시 한시간 내에 변경된 내역 처리, 기본값:0 - 이전실행 시각 이후 변경파일 탐색']) }}
     {{ macros.m_tab_content_end() }}  
   </div><!--tab-content-->

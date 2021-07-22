@@ -57,6 +57,7 @@ class GdsManager(LogicModuleBase):
         'scan_notify': 'False',
         'daily_full_scan': 'False',
         'fullscan_interval': '0',
+        'schedule_delta_min': '5',
         'execute_delta_min': '0',
         'except_paths': '',
     }
@@ -1039,7 +1040,13 @@ class GdsManager(LogicModuleBase):
                     target_parents = [x for x in subfolders.keys()]
                     #logger.debug(f'target_parents: {target_parents}')
                     target_time = entity.last_updated_time if entity.last_updated_time != None else entity.created_time
-                    logger.debug(f'감시대상 폴더 스캔: {entity.remote_path}')
+
+                    if ModelSetting.get_int('schedule_delta_min') > ModelSetting.get_int('base_interval'):
+                        delta_min = ModelSetting.get_int('base_interval')
+                    else: delta_min = ModelSetting.get_int('schedule_delta_min')
+                    target_time = target_time - timedelta(minutes=delta_min)
+                    str_target_time = target_time.strftime('%Y-%m-%dT%H:%M:%S+09:00')
+                    logger.debug(f'감시대상 폴더 스캔: {entity.remote_path}, 검색기준시각: {str_target_time}')
                     children = LibGdrive.get_children2(target_parents, mtypes=['video/', 'folder', 'shortcut'],service=service, 
                             time_after=target_time, fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'], 
                             order_by='createdTime', limit=ModelSetting.get_int('query_parents_limit'))
