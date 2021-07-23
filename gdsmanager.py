@@ -1089,9 +1089,13 @@ class GdsManager(LogicModuleBase):
                         # Plex에 있는 경우 스킵
                         plex_path = self.get_plex_path(sub_remote_path)
                         logger.debug(f'처리[{curr}/{nchildren}]: 리모트({sub_remote_path}), PLEX({plex_path})')
-                        if self.is_in_plex(plex_path, mtype=mtype):
-                            logger.debug(f'처리[{curr}/{nchildren}]: SKIP: Plex에 존재하는 파일({plex_path})')
-                            continue
+                        if not ModelSetting.get_bool('use_plex_scan'):
+                            logger.debug(f'처리[{curr}/{nchildren}]: SKIP - Plex Scan 미사용({plex_path})')
+                        else:
+                            if self.is_in_plex(plex_path, mtype=mtype):
+                                logger.debug(f'처리[{curr}/{nchildren}]: SKIP: Plex에 존재하는 파일({plex_path})')
+                                continue
+                            logger.debug(f'처리[{curr}/{nchildren}]: Plex에 존재하지 않음({plex_path})')
 
                         delim = '/' if plex_path[0] == '/' else '\\'
                         ppath = delim.join(plex_path.split(delim)[:-1])
@@ -1124,7 +1128,8 @@ class GdsManager(LogicModuleBase):
                                         continue
 
                         rname, rpath = sub_remote_path.split(':', maxsplit=1)
-                        scan_folder_id = parent_id if mtype == 'video' else child['id']
+                        #scan_folder_id = parent_id if mtype == 'video' else child['id']
+                        scan_folder_id = child['id']
                         scan_item = ScanItem.get_by_folder_id(scan_folder_id)
                         if scan_item == None:
                             scan_item = ScanItem(entity.id, rname, rpath, scan_folder_id, parent_id, plex_path)
@@ -1153,8 +1158,6 @@ class GdsManager(LogicModuleBase):
 
     def is_in_plex(self, plex_path, mtype='folder'):
         try:
-            if not ModelSetting.get_bool('use_plex_scan'):
-                return False
             ret = PlexLogicNormal.find_by_filename_part(plex_path)
             #logger.debug(ret)
             if not ret['ret']: return False
@@ -1354,9 +1357,13 @@ class GdsManager(LogicModuleBase):
                 # Plex에 있는 경우 스킵
                 plex_path = self.get_plex_path(sub_remote_path)
                 logger.debug(f'처리[{curr}/{nchildren}]: 리모트({sub_remote_path}), PLEX({plex_path})')
-                if self.is_in_plex(plex_path, mtype=mtype):
-                    logger.debug(f'처리[{curr}/{nchildren}]: SKIP: Plex에 존재하는 파일({plex_path})')
-                    continue
+                if not ModelSetting.get_bool('use_plex_scan'):
+                    logger.debug(f'처리[{curr}/{nchildren}]: SKIP - Plex Scan 미사용({plex_path})')
+                else:
+                    if self.is_in_plex(plex_path, mtype=mtype):
+                        logger.debug(f'처리[{curr}/{nchildren}]: SKIP: Plex에 존재하는 파일({plex_path})')
+                        continue
+                    logger.debug(f'처리[{curr}/{nchildren}]: Plex에 존재하지 않음({plex_path})')
 
                 # 마운트 캐시 확인 및 갱신
                 delim = '/' if plex_path[0] == '/' else '\\'
@@ -1385,7 +1392,8 @@ class GdsManager(LogicModuleBase):
 
                 #logger.debug(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 완료({plex_path})')
                 rname, rpath = sub_remote_path.split(':', maxsplit=1)
-                scan_folder_id = parent_id if mtype == 'video' else child['id']
+                #scan_folder_id = parent_id if mtype == 'video' else child['id']
+                scan_folder_id = child['id']
                 scan_item = ScanItem.get_by_folder_id(scan_folder_id)
                 if scan_item == None:
                     scan_item = ScanItem(entity.id, rname, rpath, scan_folder_id, parent_id, plex_path)

@@ -147,6 +147,7 @@ function make_list(data) {
 }
 
 function browse(obj) {
+  const video_exts = ['mp4','mkv','avi','mov','wmv','flv','f4v','swf','webm']
   var idx = $(obj).data('idx');
   console.log(idx);
   var data = current_data[idx];
@@ -157,15 +158,20 @@ function browse(obj) {
   form.method = "post";
   form.target = "_self";
   $('#remote_name').val(data.remote_name);
-  if (data.folder_id == data.parent_id) {
+  var path = data.remote_path;
+  console.log(path);
+  var ext = path.slice((path.lastIndexOf('.') - 1 >>> 0) + 2);
+  console.log(ext);
+  if (video_exts.includes(ext)) {
     var tmp = data.remote_path.split('/');
     tmp.pop();
     remote_path = tmp.join('/');
     $('#remote_path').val(remote_path);
+    $('#folder_id').val(data.parent_id);
   } else {
     $('#remote_path').val(data.remote_path);
+    $('#folder_id').val(data.folder_id);
   }
-  $('#folder_id').val(data.folder_id);
   form.submit();
 }
 
