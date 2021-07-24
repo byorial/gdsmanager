@@ -48,7 +48,7 @@ class GdsManager(LogicModuleBase):
         'gds_use_rc_auth': 'False',
         'gds_rc_user': 'sjva',
         'gds_rc_pass': 'sjva',
-        'query_parents_limit':'50',
+        'query_parents_limit':'30',
 
         # etc
         'gds_chunk_size': '1048756',
@@ -104,6 +104,10 @@ class GdsManager(LogicModuleBase):
             self.FullScanThread = threading.Thread(target=self.fullscan_thread_function, args=())
             self.FullScanThread.daemon = True
             self.FullScanThread.start()
+
+        # 한번에 조회할 폴더 수 수정
+        if ModelSetting.get_int('query_parents_limit') > 30:
+            ModelSetting.set('query_parents_limit', '30')
 
     def plugin_unload(self):
         logger.debug('dump dircache: '+str(len(self.dir_cache))+' item(s) dumped')
@@ -1046,7 +1050,7 @@ class GdsManager(LogicModuleBase):
                     else: delta_min = ModelSetting.get_int('schedule_delta_min')
                     target_time = target_time - timedelta(minutes=delta_min)
                     str_target_time = target_time.strftime('%Y-%m-%dT%H:%M:%S+09:00')
-                    logger.debug(f'감시대상 폴더 스캔: {entity.remote_path}, 검색기준시각: {str_target_time}')
+                    logger.debug(f'감시대상 폴더 스캔: {entity.remote_path}, 검색기준시각: {str_target_time}, 감시대상폴더수: {len(target_parents)}')
                     children = LibGdrive.get_children2(target_parents, mtypes=['video/', 'folder', 'shortcut'],service=service, 
                             time_after=target_time, fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'], 
                             order_by='createdTime', limit=ModelSetting.get_int('query_parents_limit'))
@@ -1385,6 +1389,11 @@ class GdsManager(LogicModuleBase):
                         if ret['ret'] != 'success':
                             logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({gppath})')
                             continue
+                        ret = self.gds_vfs_refresh(ppath)
+                        if ret['ret'] != 'success':
+                            logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
+                            continue
+                    elif not PlexLogicNormal.os_path_exists(plex_path):
                         ret = self.gds_vfs_refresh(ppath)
                         if ret['ret'] != 'success':
                             logger.error(f'처리[{curr}/{nchildren}]: 마운트캐시 갱신 실패({ppath})')
