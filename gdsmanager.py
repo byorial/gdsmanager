@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import requests
 from flask import request, render_template, jsonify, redirect, Response
 # sjva
-from framework import py_urllib, py_urllib2, SystemModelSetting, path_data, scheduler, db, socketio, py_queue
+from framework import app, py_urllib, py_urllib2, SystemModelSetting, path_data, scheduler, db, socketio, py_queue
 #from framework.common.util import convert_srt_to_vtt as convSrt2Vtt # TODO
 from plugin import LogicModuleBase
 from tool_base import ToolUtil 
@@ -362,7 +362,7 @@ class GdsManager(LogicModuleBase):
                 logger.error('구드공 access token 갱신 오류')
                 return False
 
-            logger.debug(f'구드공 사용자 인증 성공: userid({userid}), apikey({apikey})')
+            logger.debug('구드공 사용자 인증 성공')
             return True
 
         except Exception as e:
@@ -1045,9 +1045,13 @@ class GdsManager(LogicModuleBase):
                     #logger.debug(f'target_parents: {target_parents}')
                     target_time = entity.last_updated_time if entity.last_updated_time != None else entity.created_time
 
-                    if ModelSetting.get_int('schedule_delta_min') > ModelSetting.get_int('base_interval'):
-                        delta_min = ModelSetting.get_int('base_interval')
-                    else: delta_min = ModelSetting.get_int('schedule_delta_min')
+                    try:
+                        base_interval = ModelSetting.get_int('base_interval')
+                        if ModelSetting.get_int('schedule_delta_min') > base_interval: delta_min = base_interval
+                        else: delta_min = ModelSetting.get_int('schedule_delta_min')
+                    except TypeError:
+                        delta_min = ModelSetting.get_int('schedule_delta_min')
+
                     target_time = target_time - timedelta(minutes=delta_min)
                     str_target_time = target_time.strftime('%Y-%m-%dT%H:%M:%S+09:00')
                     logger.debug(f'감시대상 폴더 스캔: {entity.remote_path}, 검색기준시각: {str_target_time}, 감시대상폴더수: {len(target_parents)}')
