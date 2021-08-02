@@ -1701,7 +1701,7 @@ class GdsManager(LogicModuleBase):
                 entity.last_fullscan_time = now
                 entity.save()
 
-            logger.debug('감시대상 전체스캔 작업생성 완료: 대상폴더 {total} 개')
+            logger.debug(f'감시대상 전체스캔 작업생성 완료: 대상폴더 {total} 개')
 
         except Exception as e:
             logger.error('Exception:%s', e)
