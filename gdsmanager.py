@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import requests
 from flask import request, render_template, jsonify, redirect, Response
 # sjva
-from framework import app, py_urllib, py_urllib2, SystemModelSetting, path_data, scheduler, db, socketio, py_queue
+from framework import app, py_urllib, py_urllib2, SystemModelSetting, path_data, scheduler, db, socketio, py_queue, Job
 #from framework.common.util import convert_srt_to_vtt as convSrt2Vtt # TODO
 from plugin import LogicModuleBase
 from tool_base import ToolUtil 
@@ -35,6 +35,9 @@ class GdsManager(LogicModuleBase):
         'base_auto_start': 'False',
         'base_interval': '30',
 
+        'fullscan_auto_start': 'False',
+        'fullscan_interval': '30',
+
         # for cache
         'gds_dir_cache':'{}',
         'gds_last_remote':'',
@@ -55,8 +58,6 @@ class GdsManager(LogicModuleBase):
         'gds_dir_cache_limit':'1000',
         'use_plex_scan': 'True',
         'scan_notify': 'False',
-        'daily_full_scan': 'False',
-        'fullscan_interval': '0',
         'schedule_delta_min': '5',
         'execute_delta_min': '0',
         'except_paths': '',
@@ -73,7 +74,7 @@ class GdsManager(LogicModuleBase):
         self.last_path = ''
         self.dir_cache = {}
         self.token_cache = {}
-        self.fullscan_interval = 0
+        self.fullscan_interval = None
         
         # for gds
         self.gds_auth_status = False
@@ -96,7 +97,7 @@ class GdsManager(LogicModuleBase):
         self.last_folderid = ModelSetting.get('gds_last_folderid')
         self.last_path = ModelSetting.get('gds_last_path')
         self.gds_auth_status = self.gds_auth_init()
-        self.fullscan_interval = ModelSetting.get_int('fullscan_interval')
+        self.fullscan_interval = ModelSetting.get('fullscan_interval')
         self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
 
         if self.FullScanQueue == None: self.FullScanQueue = py_queue.Queue()
@@ -104,6 +105,11 @@ class GdsManager(LogicModuleBase):
             self.FullScanThread = threading.Thread(target=self.fullscan_thread_function, args=())
             self.FullScanThread.daemon = True
             self.FullScanThread.start()
+
+        # fullscan scheduler 등록
+        if ModelSetting.get_bool('base_auto_start'):
+            if ModelSetting.get('fullscan_interval') != '0':
+                GdsManager.fullscan_scheduler_start()
 
         # 한번에 조회할 폴더 수 수정
         if ModelSetting.get_int('query_parents_limit') > 30:
@@ -117,13 +123,18 @@ class GdsManager(LogicModuleBase):
         ModelSetting.set('gds_last_path', self.last_path)
 
     def setting_save_after(self):
-        if self.fullscan_interval != ModelSetting.get_int('fullscan_interval'):
+        if self.fullscan_interval != ModelSetting.get('fullscan_interval'):
             logger.debug(f'전체스캔 주기 변경: {self.fullscan_interval} -> {ModelSetting.get("fullscan_interval")}')
-            self.fullscan_interval = ModelSetting.get_int('fullscan_interval')
-            if self.fullscan_interval == 0:
+            self.fullscan_interval = ModelSetting.get('fullscan_interval')
+            if self.fullscan_interval == '0':
                 logger.debug('감시대상 전체스캔을 수행하지 않음')
+                GdsManager.fullscan_scheduler_stop()
             else:
-                logger.debug(f'감시대상의 전체스캔을 {self.fullscan_interval} 일 후에 실행')
+                logger.debug(f'감시대상의 전체스캔 스케쥴 변경: {self.fullscan_interval}')
+                if scheduler.is_include('gdsmanager_fullscan'):
+                    GdsManager.fullscan_scheduler_stop()
+
+                GdsManager.fullscan_scheduler_start()
 
         self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
 
@@ -153,8 +164,6 @@ class GdsManager(LogicModuleBase):
             arg['sub'] = name
             arg['proxy_url'] = ToolUtil.make_apikey_url(f'/{package_name}/api/{name}/proxy')
             arg['proxy_subtitle_url'] = ToolUtil.make_apikey_url(f'/{package_name}/api/{name}/proxy')
-            #arg['proxy_url'] = ToolUtil.make_apikey_url(f'/system/api/gds')
-            #arg['proxy_subtitle_url'] = ToolUtil.make_apikey_url(f'/system/api/gds_subtitle')
 
             if sub == 'setting':
                 arg['scheduler'] = str(scheduler.is_include(self.get_scheduler_name()))
@@ -387,7 +396,6 @@ class GdsManager(LogicModuleBase):
             if self.gds_creds == None:
                 logger.error('구드공 access token 갱신 오류')
                 return False
-            #logger.error('gds token refresh succeed')
             return True
 
         except Exception as e:
@@ -1023,6 +1031,8 @@ class GdsManager(LogicModuleBase):
                         subfolders = json.loads(entity.subfolders)
 
                     now = datetime.now()
+                    # 전체스캔 스케쥴러 분리
+                    '''
                     if entity.last_fullscan_time == None:
                         entity.last_fullscan_time = entity.last_updated_time if entity.last_updated_time != None else entity.created_time
 
@@ -1040,6 +1050,7 @@ class GdsManager(LogicModuleBase):
                         entity.last_fullscan_time = now
                         entity.save()
                         continue
+                    '''
 
                     target_parents = [x for x in subfolders.keys()]
                     #logger.debug(f'target_parents: {target_parents}')
@@ -1492,12 +1503,14 @@ class GdsManager(LogicModuleBase):
         fm = '%Y-%m-%d %H:%M:%S'
         return time.strftime(fm)
 
+    """
     def is_fullscan_target(self, prev_fullscan_time):
         interval = ModelSetting.get_int('fullscan_interval')
         if interval == 0: return False
         now = datetime.now()
         target_time = prev_fullscan_time + timedelta(days=interval)
         return (now > target_time)
+    """
 
     def is_except_path(self, path):
         from fnmatch import fnmatch
@@ -1667,3 +1680,51 @@ class GdsManager(LogicModuleBase):
         except Exception as e:
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
+
+    @staticmethod
+    def fullscan_scheduler_function():
+        try:
+            entities = WatchItem.get_scheduled_entities()
+            total = len(entities)
+            logger.debug(f'감시대상 전체스캔 스케쥴러 시작: 대상폴더 {total} 개')
+            for entity in entities:
+                now = datetime.now()
+
+                def func():
+                    self.vfs_refresh_thread(entity.id)
+
+                thread = threading.Thread(target=func, args=())
+                thread.setDaemon(True)
+                thread.start()
+
+                entity.last_updated_time = now
+                entity.last_fullscan_time = now
+                entity.save()
+
+            logger.debug('감시대상 전체스캔 작업생성 완료: 대상폴더 {total} 개')
+
+        except Exception as e:
+            logger.error('Exception:%s', e)
+            logger.error(traceback.format_exc())
+
+    @staticmethod
+    def fullscan_scheduler_start():
+        try:
+            if not scheduler.is_include('gdsmanager_fullscan'):
+                interval = ModelSetting.get('fullscan_interval')
+                try: interval = str(int(interval) * 60 * 24)
+                except ValueError: pass
+                job = Job(package_name, 'gdsmanager_fullscan', interval, GdsManager.fullscan_scheduler_function, '감시대상 전체스캔', True)
+                scheduler.add_job_instance(job)
+        except Exception as e:
+            logger.error('Exception:%s', e)
+            logger.error(traceback.format_exc())
+
+    @staticmethod
+    def fullscan_scheduler_stop():
+        try:
+            scheduler.remove_job('gdsmanager_fullscan')
+        except Exception as e:
+            logger.error('Exception:%s', e)
+            logger.error(traceback.format_exc())
+
