@@ -109,7 +109,7 @@ class GdsManager(LogicModuleBase):
         # fullscan scheduler 등록
         if ModelSetting.get_bool('base_auto_start'):
             if ModelSetting.get('fullscan_interval') != '0':
-                GdsManager.fullscan_scheduler_start()
+                self.fullscan_scheduler_start()
 
         # 한번에 조회할 폴더 수 수정
         if ModelSetting.get_int('query_parents_limit') > 30:
@@ -128,13 +128,13 @@ class GdsManager(LogicModuleBase):
             self.fullscan_interval = ModelSetting.get('fullscan_interval')
             if self.fullscan_interval == '0':
                 logger.debug('감시대상 전체스캔을 수행하지 않음')
-                GdsManager.fullscan_scheduler_stop()
+                self.fullscan_scheduler_stop()
             else:
                 logger.debug(f'감시대상의 전체스캔 스케쥴 변경: {self.fullscan_interval}')
                 if scheduler.is_include('gdsmanager_fullscan'):
-                    GdsManager.fullscan_scheduler_stop()
+                    self.fullscan_scheduler_stop()
 
-                GdsManager.fullscan_scheduler_start()
+                self.fullscan_scheduler_start()
 
         self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
 
@@ -1681,8 +1681,7 @@ class GdsManager(LogicModuleBase):
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
 
-    @staticmethod
-    def fullscan_scheduler_function():
+    def fullscan_scheduler_function(self):
         try:
             entities = WatchItem.get_scheduled_entities()
             total = len(entities)
@@ -1707,21 +1706,19 @@ class GdsManager(LogicModuleBase):
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
 
-    @staticmethod
-    def fullscan_scheduler_start():
+    def fullscan_scheduler_start(self):
         try:
             if not scheduler.is_include('gdsmanager_fullscan'):
                 interval = ModelSetting.get('fullscan_interval')
                 try: interval = str(int(interval) * 60 * 24)
                 except ValueError: pass
-                job = Job(package_name, 'gdsmanager_fullscan', interval, GdsManager.fullscan_scheduler_function, '감시대상 전체스캔', True)
+                job = Job(package_name, 'gdsmanager_fullscan', interval, self.fullscan_scheduler_function, '감시대상 전체스캔', True)
                 scheduler.add_job_instance(job)
         except Exception as e:
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
 
-    @staticmethod
-    def fullscan_scheduler_stop():
+    def fullscan_scheduler_stop(self):
         try:
             scheduler.remove_job('gdsmanager_fullscan')
         except Exception as e:
