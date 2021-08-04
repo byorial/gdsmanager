@@ -14,6 +14,7 @@ from system.logic_command import SystemLogicCommand
 
 from lib_gdrive import LibGdrive
 from tool_base import ToolRclone, ToolBaseNotify
+from rclone.model import ModelSetting as RcloneModelSetting
 from plex.model import ModelSetting as PlexModelSetting
 from plex.logic_normal import LogicNormal as PlexLogicNormal
 from plex.logic import Logic as PlexLogic
@@ -91,6 +92,7 @@ class GdsManager(LogicModuleBase):
         self.scheduler_desc = '구드공 변경사항 조회 및 갱신'
 
     def plugin_load(self):
+        logger.debug(f'rclone_path: {RcloneModelSetting.get("rclone_bin_path")}')
         self.dir_cache = json.loads(ModelSetting.get('gds_dir_cache'))
         logger.debug('load dircache: '+str(len(self.dir_cache))+ ' item(s) loaded')
         self.last_remote = ModelSetting.get('gds_last_remote')
@@ -1239,7 +1241,7 @@ class GdsManager(LogicModuleBase):
         try:
             rc_path = self.get_rc_path(plex_path)
             logger.debug(f'rc_path: {rc_path}')
-            command = ['rclone', 'rc', 'vfs/refresh', '--rc-addr']
+            command = [RcloneModelSetting.get('rclone_bin_path'), 'rc', 'vfs/refresh', '--rc-addr']
             command.append(ModelSetting.get('gds_rc_addr'))
             if ModelSetting.get_bool('gds_use_rc_auth'):
                 command.append('--rc-user')
