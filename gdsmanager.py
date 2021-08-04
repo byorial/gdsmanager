@@ -1060,7 +1060,7 @@ class GdsManager(LogicModuleBase):
                         base_interval = ModelSetting.get_int('base_interval')
                         if ModelSetting.get_int('schedule_delta_min') > base_interval: delta_min = base_interval
                         else: delta_min = ModelSetting.get_int('schedule_delta_min')
-                    except TypeError:
+                    except ValueError:
                         delta_min = ModelSetting.get_int('schedule_delta_min')
 
                     target_time = target_time - timedelta(minutes=delta_min)
