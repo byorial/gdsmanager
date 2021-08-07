@@ -39,6 +39,9 @@ class GdsManager(LogicModuleBase):
         'fullscan_auto_start': 'False',
         'fullscan_interval': '30',
 
+        'use_sjva_group_account': 'False',
+        'sjva_group_remote_name': 'gds',
+
         # for cache
         'gds_dir_cache':'{}',
         'gds_last_remote':'',
@@ -86,6 +89,10 @@ class GdsManager(LogicModuleBase):
         self.gds_creds = None
         self.except_paths = []
 
+        # for sjva group 
+        self.use_sjva_group_account = False
+        self.service = None
+
         self.FullScanQueue = None
         self.FullScanThread = None
 
@@ -101,6 +108,7 @@ class GdsManager(LogicModuleBase):
         self.gds_auth_status = self.gds_auth_init()
         self.fullscan_interval = ModelSetting.get('fullscan_interval')
         self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
+        self.use_sjva_group_account = ModelSetting.get('use_sjva_group_account')
 
         if self.FullScanQueue == None: self.FullScanQueue = py_queue.Queue()
         if self.FullScanThread == None:
@@ -112,10 +120,6 @@ class GdsManager(LogicModuleBase):
         if ModelSetting.get_bool('base_auto_start'):
             if ModelSetting.get('fullscan_interval') != '0':
                 self.fullscan_scheduler_start()
-
-        # 한번에 조회할 폴더 수 수정
-        if ModelSetting.get_int('query_parents_limit') > 30:
-            ModelSetting.set('query_parents_limit', '30')
 
     def plugin_unload(self):
         logger.debug('dump dircache: '+str(len(self.dir_cache))+' item(s) dumped')
@@ -137,6 +141,14 @@ class GdsManager(LogicModuleBase):
                     self.fullscan_scheduler_stop()
 
                 self.fullscan_scheduler_start()
+
+        if ModelSetting.get_int('query_parents_limit') < 30: ModelSetting.set('query_parents_limit', '30')
+        if ModelSetting.get_int('query_parents_limit') > 100: ModelSetting.set('query_parents_limit', '100')
+
+        if self.use_sjva_group_account != ModelSetting.get_bool('use_sjva_group_account'):
+            self.use_sjva_group_account = ModelSetting.get_bool('use_sjva_group_account')
+            # false -> true
+            self.gds_auth_status = self.gds_auth_init()
 
         self.except_paths = list(filter(None, sorted(ModelSetting.get_list('except_paths', '\n'))))
 
@@ -183,7 +195,7 @@ class GdsManager(LogicModuleBase):
                     arg['last_folderid'] = self.last_folderid
                     arg['last_path'] = self.last_path
 
-                arg['gds_remote_name'] = ModelSetting.get('gds_remote_name')
+                arg['gds_remote_name'] = ModelSetting.get('gds_remote_name') if ModelSetting.get_bool('use_sjva_group_account') == False else ModelSetting.get('sjva_group_remote_name')
                 arg['watch_pathes'] = self.get_watch_pathes()
             elif sub == 'video' or sub == 'vrvideo':
                 arg['play_title'] = req.form['play_title']
@@ -354,10 +366,19 @@ class GdsManager(LogicModuleBase):
     def gds_auth_init(self):
         try:
             logger.debug('구드공 사용자 인증 시도')
+
+            if ModelSetting.get_bool('use_sjva_group_account') and ModelSetting.get('sjva_group_remote_name') != '':
+                logger.debug(f'SJVA 그룹사용자용: 구드공 사용자 인증 시도: {ModelSetting.get("sjva_group_remote_name")}')
+                remote = self.get_remote_by_name(ModelSetting.get('sjva_group_remote_name'))
+                self.service = LibGdrive.auth_by_rclone_remote(remote)
+                if self.service != None:
+                    logger.debug(f'SJVA 그룹사용자용: 구드공 사용자 인증 성공: {ModelSetting.get("sjva_group_remote_name")}')
+                    return True
+
             userid = SystemModelSetting.get('sjva_me_user_id')
             apikey = SystemModelSetting.get('auth_apikey')
             auth_url = "https://sjva.me/sjva/gds_auth.php"
-            data = { 'gds_userid':userid, 'gds_apikey':apikey, 'mode':'default' }
+            data = { 'gds_userid':userid, 'gds_apikey':apikey, 'mode':'gds_manager,all' }
             r = requests.post(auth_url, data=data).json()
             if r['result'] != 'success':
                 logger.error('구드공 사용자 인증 실패: {}'.format(r['result']))
@@ -384,6 +405,9 @@ class GdsManager(LogicModuleBase):
 
     def gds_auth(self):
         try:
+            if ModelSetting.get_bool('use_sjva_group_account'):
+                return True
+
             if self.gds_creds != None:
                 if not self.gds_creds.access_token_expired:
                     return True
@@ -509,7 +533,10 @@ class GdsManager(LogicModuleBase):
             if remote_name == ModelSetting.get('gds_remote_name'):
                 service = LibGdrive.sa_authorize_by_info(self.gds_sa_info, scopes=self.gds_scopes, impersonate=self.gds_impersonate, return_service=True)
             else:
-                service = LibGdrive.auth_by_rclone_remote(remote)
+                if remote_name == ModelSetting.get('sjva_group_remote_name') and self.service != None:
+                    service = self.service
+                else:
+                    service = LibGdrive.auth_by_rclone_remote(remote)
 
             if not service:
                 logger.error('failed to auth gdrive api')
@@ -677,9 +704,13 @@ class GdsManager(LogicModuleBase):
                 logger.debug(f'{plex_path} does not exists in Plex Library')
                 return {'ret':'error', 'msg':f'Plex 라이브러리에 {plex_path} 를 등록해주세요'}
 
-            if not self.gds_auth():
-                return {'ret':'error', 'msg':'인증실패: 다시 시도해주세요'}
-            service = LibGdrive.sa_auth_by_creds(self.gds_creds)
+            if ModelSetting.get_bool('use_sjva_group_account'):
+                service = self.service
+            else:
+                if not self.gds_auth():
+                    return {'ret':'error', 'msg':'인증실패: 다시 시도해주세요'}
+                service = LibGdrive.sa_auth_by_creds(self.gds_creds)
+
             children = LibGdrive.get_children_for_sa(folder_id, service=service, 
                     fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'])
 
@@ -1014,7 +1045,8 @@ class GdsManager(LogicModuleBase):
             total = len(entities)
             logger.debug('감시대상 폴더: %d', total)
             if total != 0 and self.gds_auth():
-                service = LibGdrive.sa_auth_by_creds(self.gds_creds)
+                if ModelSetting.get_bool('use_sjva_group_account'): service = self.service
+                else: service = LibGdrive.sa_auth_by_creds(self.gds_creds)
                 if service == None:
                     logger.error('Gdrive API 인증 실패, sjva.me 사용자ID, apikey를 확인해주세요')
                     return
@@ -1308,7 +1340,8 @@ class GdsManager(LogicModuleBase):
                 return {'ret':'error', 'msg':'인증실패: 잠시 후 다시 시도해주세요'}
 
             now = datetime.now()
-            service = LibGdrive.sa_auth_by_creds(self.gds_creds)
+            if ModelSetting.get_bool('use_sjva_group_account'): service = self.service
+            else: service = LibGdrive.sa_auth_by_creds(self.gds_creds)
             target_time = entity.last_updated_time if entity.last_updated_time != None else entity.created_time
             delta_min = ModelSetting.get_int('execute_delta_min')
             if delta_min > 0: target_time = target_time - timedelta(minutes=delta_min)
@@ -1471,7 +1504,10 @@ class GdsManager(LogicModuleBase):
                 logger.error(f'failed to get authorize by remote_name({remote_name})')
                 return {'ret':'error', 'msg': 'Failed to auth gdrive api'}
 
-            service = LibGdrive.sa_auth_by_creds(self.gds_creds)
+            if ModelSetting.get_bool('use_sjva_group_account'):
+                service = self.service
+            else:
+                service = LibGdrive.sa_auth_by_creds(self.gds_creds)
             if not service:
                 return {'ret':'error', 'msg': 'Failed to auth gdrive api'}
 

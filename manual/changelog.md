@@ -1,5 +1,9 @@
 ### 업데이트 내역
 ---
+##### v0.1.2.2 (21.08.07) sjva.me 인증변경
+* sjva.me 인증 gdsmanager 전용으로 변경(**회원등급 4 이상 사용가능**)
+ 	* 사용등급 기준: 등급4 - default만 가능, 등급5이상 - all 옵션 가능   
+ 	`※ default: MOVIE/VOD/KTV, all: default항목 + FTV/MUSIC/AV`
 ##### v0.1.2.1 (21.08.05) rclone 경로 처리 수정
 * rclone 경로를 툴-Rclone 설정에서 가져오도록 변경
 ##### v0.1.2.0 (21.08.02) 전체스캔 스케쥴러 분리
