@@ -20,10 +20,8 @@
       {{ macros.setting_input_text('fullscan_interval', '전체스캔 스케쥴 정보', value=arg['fullscan_interval'], col='3', desc=['감시대상 폴더의 전체스캔 스케쥴 주기','Inverval(일 단위)이나 Cron 설정, 입력 후 저장해야 반영됨', '"0" 입력시 실행안함']) }}
       {{ macros.setting_checkbox('base_auto_start', '시작시 자동실행', value=arg['base_auto_start'], desc='On : 시작시 자동으로 스케쥴러에 등록됩니다.') }}
       {{ macros.setting_input_text('gds_remote_name', '구드공리모트명', value=arg['gds_remote_name'], desc=['구드공 바로보기용 리모트명, SJVA사용자 전용','rclone.conf에 없는 리모트명으로 입력해야함', '구드공 바로보기용 리모트 추가 불필요']) }}
-      <!--
       {{ macros.setting_checkbox('use_sjva_group_account', 'sjva.me 그룹계정 사용', value=arg['use_sjva_group_account'], desc=['On: 구드공 관리에 sjva.me 그룹 계정 사용 Off: sjva.me인증 사용(공용)','sjva.me 그룹사용자의 경우 On권장']) }}
-      {{ macros.setting_input_text('sjva_group_remote_name', 'sjva.me 그룹 리모트명', value=arg['sjva_group_remote_name'], desc=['sjva그룹 사용자로 인증한 remote 명 입력, rclone.conf에 remote가 등록되어있어야함']) }}
-      -->
+      {{ macros.setting_input_text_and_buttons('sjva_group_remote_name', 'sjva.me 그룹 리모트명', [['apply_remote_btn', '변경적용']], value=arg['sjva_group_remote_name'], desc=['sjva그룹 사용자로 인증한 remote 명 입력, rclone.conf에 remote가 등록되어있어야함', '저장후 번경적용 버튼클릭시 변경된 remote_name 을 감시대상에 적용합니다.']) }}
       {{ macros.setting_input_text('gds_plex_mount_path', '구드공마운트경로', value=arg['gds_plex_mount_path'], desc=['Plex 기준 구드공 마운트 경로', 'GDS: 를 /mnt/gds로 마운트한 경우 /mnt/gds']) }}
       {{ macros.setting_input_text('gds_rc_addr', 'RC 주소', value=arg['gds_rc_addr'], desc=['Plex에 마운트된 리모트 RC주소','127.0.0.1:5572 형태로 ip:port 지정']) }}
       {{ macros.setting_checkbox('gds_use_rc_auth', 'RC 인증 사용', value=arg['gds_use_rc_auth'], desc=['On: rlcone rc 인증 사용']) }}
@@ -113,6 +111,24 @@ function execute_reset(terget) {
     }
   });
 }
+
+$("body").on('click', '#apply_remote_btn', function(e){
+  e.preventDefault();
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/apply_remote',
+    type: "POST",
+    cache: false,
+    data: {},
+    dataType: "json",
+    success: function (data) {
+      if ( data.ret == 'success') {
+        $.notify('<strong>성공: '+data.msg+'</strong>', {type: 'success'});
+      } else {
+        $.notify('<strong>실패: ' +data.msg+ '</strong>', {type: 'warning'});
+      }
+    }
+  });
+});
 
 
 

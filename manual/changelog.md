@@ -1,5 +1,19 @@
 ### 업데이트 내역
 ---
+##### v0.1.2.3 (21.08.08) sjva.me 그룹 사용자(무료계정포함) 지원 추가
+* 구드공바로보기용 공용계정이 아닌, 구드공바로보기용 공드에 접근가능한 계정을 이용하여 변경사항 감시 수행함
+* 적용 순서(무료계정등 sjva.me그룹 사용자만 해당함)
+	1. sjva.me 그룹계정 사용자의 경우 해당계정으로 project 생성 및 Google Drive API 사용설정
+	2. rclone config 수행   
+	***※ rclone.conf에 반드시*** `root_folder_id`를 ***등록***해야함(MountPoint의 'default' or 'all' 중 하나로 등록)
+	![rclone config](https://cdn.discordapp.com/attachments/845172443214774292/873859603228688384/unknown.png)
+	3. 구드공관리 플러그인 sjva.me그룹계정 사용 적용
+	![gdsmanager setting](https://cdn.discordapp.com/attachments/845172443214774292/873859225724518400/unknown.png)
+		1. 구드공관리-설정-GDS: sjva.me그룹계정사용 On으로 변경
+		2. sjva.me 구룹리모트명 입력 후 _'설정 저장'_
+		3. _'변경적용'_ 버튼 클릭하여 감시대상경로에 변경사항 반영
+* sjva.me 그룹계정 사용시 본인 Project를 사용하므로 구드공바로보기 전체 API사용량에 영향을 미치지 않으며, sjva.me 장애시에도 작동함
+* sjva.me 그룹사용자의 경우 되도록 ***본인계정을 이용하여 구드공바로보기 설정 권장함, 마운트할때도 본인계정으로 마운트 권장(default or all)***
 ##### v0.1.2.2 (21.08.07) sjva.me 인증변경
 * sjva.me 인증 gdsmanager 전용으로 변경(**회원등급 4 이상 사용가능**)
  	* 사용등급 기준: 등급4 - default만 가능, 등급5이상 - all 옵션 가능   

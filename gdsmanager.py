@@ -253,6 +253,8 @@ class GdsManager(LogicModuleBase):
                     ret = {'ret':'success', 'msg':'구드공 사용자 인증 성공'}
                 else:
                     ret = {'ret':'error', 'msg':'구드공 사용자 인증실패'}
+            elif sub == 'apply_remote':
+                ret = self.apply_remote()
 
             return jsonify(ret)
         except Exception as e: 
@@ -348,6 +350,8 @@ class GdsManager(LogicModuleBase):
 
     def get_remote_names(self):
         remotes = ToolRclone.config_list()
+        if ModelSetting.get_bool('use_sjva_group_account'):
+            return [x for x in remotes.keys()]
         return [ModelSetting.get('gds_remote_name')] + [x for x in remotes.keys()]
 
     def get_remote_by_name(self, remote_name):
@@ -529,6 +533,9 @@ class GdsManager(LogicModuleBase):
                 is_root = True
                 if 'team_drive' in remote: folder_id = remote['team_drive']
                 elif 'root_folder_id' in remote: folder_id = remote['root_folder_id']
+
+            if folder_id == '': folder_id = 'root'
+            logger.debug(f'target_folder_id: {folder_id}')
 
             if remote_name == ModelSetting.get('gds_remote_name'):
                 service = LibGdrive.sa_authorize_by_info(self.gds_sa_info, scopes=self.gds_scopes, impersonate=self.gds_impersonate, return_service=True)
@@ -1225,7 +1232,10 @@ class GdsManager(LogicModuleBase):
     def get_plex_path(self, remote_path):
         try:
             ret = remote_path
-            gds_remote_root = ModelSetting.get('gds_remote_name') + ':'
+            if ModelSetting.get_bool('use_sjva_group_account'):
+                gds_remote_root = ModelSetting.get('sjva_group_remote_name') + ':'
+            else:
+                gds_remote_root = ModelSetting.get('gds_remote_name') + ':'
             plex_mount_path = ModelSetting.get('gds_plex_mount_path')
             if remote_path.startswith(gds_remote_root):
                 ret = remote_path.replace(gds_remote_root, plex_mount_path)
@@ -1326,7 +1336,36 @@ class GdsManager(LogicModuleBase):
         except Exception as e:
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
-            return {'ret':'error', 'msg':f'삭제 실패: 로그를 확인해주세요.'}
+            return {'ret':'error', 'msg':'삭제 실패: 로그를 확인해주세요.'}
+ 
+    def apply_remote(self):
+        try:
+            use_sjva_group_account = ModelSetting.get_bool('use_sjva_group_account')
+            if use_sjva_group_account:
+                remote = self.get_remote_by_name(ModelSetting.get('sjva_group_remote_name'))
+                if remote == None:
+                    return {'ret':'error', 'msg':'rclone.conf의 리모트 정보를 확인해주세요.'}
+                from_remote = ModelSetting.get('gds_remote_name') + ':/'
+                ttoo_remote = ModelSetting.get('sjva_group_remote_name') + ':/'
+            else:
+                from_remote = ModelSetting.get('sjva_group_remote_name') + ':/'
+                ttoo_remote = ModelSetting.get('gds_remote_name') + ':/'
+
+            logger.debug(f'감시대상 갱신: {from_remote} > {ttoo_remote}')
+            for entity in WatchItem.get_all_entities():
+                entity.remote_path = entity.remote_path.replace(from_remote, ttoo_remote)
+                subfolders = json.loads(entity.subfolders)
+                for folder_id, dname in subfolders.items():
+                    subfolders[folder_id] = dname.replace(from_remote, ttoo_remote)
+                entity.subfolders = json.dumps(subfolders)
+                entity.save()
+
+            return {'ret':'success', 'msg':f'리모트 업데이트 완료:{from_remote} > {ttoo_remote}'}
+
+        except Exception as e:
+            logger.error('Exception:%s', e)
+            logger.error(traceback.format_exc())
+            return {'ret':'error', 'msg':'감시대상 리모트 갱신을 실패하였습니다.'}
  
     def one_execute(self, req):
         try:
