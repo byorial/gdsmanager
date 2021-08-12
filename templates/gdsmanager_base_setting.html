@@ -36,7 +36,7 @@
     {{ macros.m_tab_content_start('etc', false) }}
       {{ macros.setting_input_int('gds_chunk_size', 'Chunk 크기', value=arg['gds_chunk_size'], desc=['파일요청시 Chunk 크기(1회 요청사이즈), Byte단위']) }}
       {{ macros.setting_input_int('gds_dir_cache_limit', 'DIR캐시크기', value=arg['gds_dir_cache_limit'], desc=['디렉토리 탐색 캐시 크기 제한, 메모리 과사용 방지용, 단위: 개']) }}
-      {{ macros.setting_button([['remove_watch', '감시대상일괄삭제'], ['remove_scan','스캔내역일괄삭제']], '데이터 일괄삭제', desc=['감시대상, 스캔내역을 일괄 삭제']) }}
+      {{ macros.setting_button([['remove_watch', '감시대상일괄삭제'], ['remove_scan','갱신목록일괄삭제']], '데이터 일괄삭제', desc=['감시대상, 갱신목록을 일괄 삭제']) }}
       {{ macros.setting_button([['gds_auth_btn', '인증요청']], '구드공 사용자인증', desc=['SJVA시작시 자동로드함, sjva.me 접속 불가 등으로 인증이 안된경우에만 사용']) }}
       {{ macros.setting_checkbox('use_plex_scan', '스캔명령 전송여부', value=arg['use_plex_scan'], desc=['On: 신규아이템 확인시 Plex로 스캔명령을 전송함, Off: 스캔명령 전송안함(마운트캐시만갱신)']) }}
       {{ macros.setting_checkbox('scan_notify', '스캔완료시 알림전송', value=arg['scan_notify'], desc=['스캔완료시 알림 메시지를 전송합니다.','ID: gdsmanager_scan_completed','설정필요: 시스템-설정-알림-고급']) }}
