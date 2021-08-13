@@ -531,8 +531,8 @@ class GdsManager(LogicModuleBase):
             remote = self.get_remote_by_name(remote_name)
             if folder_id == 'root':
                 is_root = True
-                if 'team_drive' in remote: folder_id = remote['team_drive']
-                elif 'root_folder_id' in remote: folder_id = remote['root_folder_id']
+                if 'root_folder_id' in remote: folder_id = remote['root_folder_id']
+                elif 'team_drive' in remote: folder_id = remote['team_drive']
 
             if folder_id == '': folder_id = 'root'
             logger.debug(f'target_folder_id: {folder_id}')
