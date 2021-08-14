@@ -74,8 +74,16 @@ var gds_remote = "{{arg['gds_remote_name']}}";
 var str_watch_pathes = "{{arg['watch_pathes']}}";
 var watch_pathes = str_watch_pathes.split('|');
 var use_plex_scan = "{{arg['use_plex_scan']}}"
+var context_menu_right = "{{arg['context_menu_right']}}";
  
 $(document).ready(function(){
+  if (context_menu_right == 'True') {
+    var trigger_type = 'right';
+    var selector_type = '.ctxfile';
+  } else {
+    var trigger_type = 'left';
+    var selector_type = '.ctxmtype';
+  }
   if (watch_pathes[0] == "") {
     watch_pathes = new Array(0);
   }
@@ -86,8 +94,8 @@ $(document).ready(function(){
     listgdrive(curr_remote, curr_path, curr_folder_id);
   }
   $.contextMenu({
-    selector: '.usectx',
-    trigger: 'right',
+    selector: selector_type,
+    trigger: trigger_type,
     callback: function(key, options) {
       var mtype = $(this).attr('mtype');
       var folder_id = $(this).attr('folder_id');
@@ -329,9 +337,17 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
 	  if (dt.trashed == true) { continue;}
 	  new_obj += '<span class="list-group list-group-horizontal col-md-12" style="align:left;">'
 	  if (dt.mimeType == 'application/vnd.google-apps.folder') {
-	    new_obj += '<span class="list-group-item col-md-2">dir</span>'
+            if (context_menu_right == 'True') {
+	      new_obj += '<span class="list-group-item col-md-2">dir</span>'
+	    } else {
+	      new_obj += '<span class="list-group-item list-group-item-action ctxmtype col-md-2" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'">dir</span>';
+	    }
 	  } else if (dt.mimeType == 'application/vnd.google-apps.shortcut') {
-	    new_obj += '<span class="list-group-item col-md-2">Shortcut</span>'
+            if (context_menu_right == 'True') {
+	      new_obj += '<span class="list-group-item col-md-2">shortcut</span>'
+	    } else {
+	      new_obj += '<span class="list-group-item list-group-item-action ctxmtype col-md-2" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'">shortcut</span>';
+	    }
 	  } else {
             if (dt.mimeType.startsWith('application/')) {
             	mtype = dt.mimeType.split('/')[1]
@@ -341,17 +357,29 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
 	    } else {
             	mtype = dt.mimeType.split('/')[0]
 	    }
-	    new_obj += '<span class="list-group-item col-md-2">'+mtype+'</span>'
+            if (context_menu_right == 'True') {
+	      new_obj += '<span class="list-group-item col-md-2">'+mtype+'</span>'
+	    } else {
+	      if (curr_remote == gds_remote) {
+	        if (dt.mimeType == 'application/vnd.google-apps.shortcut') {
+	          new_obj += '<span class="list-group-item list-group-item-action ctxmtype col-md-2" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.shortcutDetails.targetId+'" name="'+dt.name+'">'+mtype+'</span>';
+		} else {
+	          new_obj += '<span class="list-group-item list-group-item-action ctxmtype col-md-2" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'">'+mtype+'</span>';
+		}
+	      } else {
+	        new_obj += '<span class="list-group-item col-md-2">'+mtype+'</span>';
+	      }
+	    }
 	  }
 	  if (dt.mimeType == 'application/vnd.google-apps.shortcut') {
 	    if (curr_remote == gds_remote) {
-              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path usectx col-md-8" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.shortcutDetails.targetId+'" name="'+dt.name+'" style="text-align:left;">'+dt.name+'</a>';
+              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path ctxfile col-md-8" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.shortcutDetails.targetId+'" name="'+dt.name+'" style="text-align:left;">'+dt.name+'</a>';
 	    } else {
               new_obj += '<a href="#" class="list-group-item list-group-item-action item_path col-md-8" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.shortcutDetails.targetId+'" style="text-align:left;">'+dt.name+'</a>';
 	    }
 	  } else {
 	    if (curr_remote == gds_remote) {
-              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path usectx col-md-8" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'" style="text-align:left;">'+dt.name+'</a>';
+              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path ctxfile col-md-8" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'" style="text-align:left;">'+dt.name+'</a>';
 	    } else {
               new_obj += '<a href="#" class="list-group-item list-group-item-action item_path col-md-8" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" style="text-align:left;">'+dt.name+'</a>';
 	    }

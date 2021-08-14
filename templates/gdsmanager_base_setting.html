@@ -34,6 +34,7 @@
       {{ macros.setting_input_textarea('except_paths', '마운트 제외 경로', value=arg['except_paths'], col='12', row='20', desc=['Rclone Mount 시 filter로 제외한 목록, 앞에 "-"없이 제외할 목록만 입력, 구분자는 엔터','예) /VOD/1.방송중/시사/**']) }}
     {{ macros.m_tab_content_end() }}  
     {{ macros.m_tab_content_start('etc', false) }}
+      {{ macros.setting_checkbox('context_menu_right', 'Context메뉴유형', value=arg['context_menu_right'], desc=['On: 우클릭 사용(재생/자막은 좌클릭)','Off: 좌클릭사용(ios 등 미지원브라우저에서 사용','좌클릭사용시 경로가 아닌 미디어유형 위치를 클릭하여 메뉴사용 가능']) }}
       {{ macros.setting_input_int('gds_chunk_size', 'Chunk 크기', value=arg['gds_chunk_size'], desc=['파일요청시 Chunk 크기(1회 요청사이즈), Byte단위']) }}
       {{ macros.setting_input_int('gds_dir_cache_limit', 'DIR캐시크기', value=arg['gds_dir_cache_limit'], desc=['디렉토리 탐색 캐시 크기 제한, 메모리 과사용 방지용, 단위: 개']) }}
       {{ macros.setting_button([['remove_watch', '감시대상일괄삭제'], ['remove_scan','갱신목록일괄삭제']], '데이터 일괄삭제', desc=['감시대상, 갱신목록을 일괄 삭제']) }}

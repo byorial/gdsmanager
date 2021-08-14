@@ -1,5 +1,11 @@
 ### 업데이트 내역
 ---
+##### v0.1.2.5 (21.08.14) Content Menu 옵션 처리
+* IOS 등 모바일 기기에서 사용가능하도록 Contenxt 메뉴 옵션 추가
+	* 설정-기타: 메뉴유형 Off시 탐색메뉴 미디어유형을 '좌클릭'으로 컨텍스트 메뉴 사용 가능
+	![Context Menu설정](https://cdn.discordapp.com/attachments/845172443214774292/876070758651158558/unknown.png)
+	* '좌클릭' 사용시 클릭위치는파일/폴더명이 아닌  ***미디어유형(목록의 좌측)임***
+	![Context Menu사용](https://cdn.discordapp.com/attachments/845172443214774292/876071183458631680/unknown.png)
 ##### v0.1.2.4 (21.08.13) rclone.conf root_folder_id 우선변경
 * rclone.conf에 root_folder_id, teamdrive 설정간 우선순위 변경
 ##### v0.1.2.3 (21.08.08) sjva.me 그룹 사용자(무료계정포함) 지원 추가

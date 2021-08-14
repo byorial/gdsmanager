@@ -65,6 +65,7 @@ class GdsManager(LogicModuleBase):
         'schedule_delta_min': '5',
         'execute_delta_min': '0',
         'except_paths': '',
+        'context_menu_right': 'True',
     }
 
 
