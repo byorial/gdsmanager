@@ -900,7 +900,8 @@ class GdsManager(LogicModuleBase):
                         return remote_path + '/' + child['name']
                 return None
 
-            service = LibGdrive.sa_authorize_by_info(self.gds_sa_info, scopes=self.gds_scopes, impersonate=self.gds_impersonate, return_service=True)
+            if ModelSetting.get_bool('use_sjva_group_account'): service = self.service
+            else: service = LibGdrive.sa_auth_by_creds(self.gds_creds)
             if not service:
                 logger.error('failed to auth gdrive api')
                 return None
