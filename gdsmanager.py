@@ -552,9 +552,9 @@ class GdsManager(LogicModuleBase):
 
             #logger.debug(f'{folder_id} search gdrive')
             if 'service_account_file' in remote:
-                children = LibGdrive.get_children_for_sa(folder_id, service=service, fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'])
+                children = LibGdrive.get_children_for_sa(folder_id, service=service, fields=['id','name','mimeType','trashed','size','parents','createdTime','shortcutDetails'])
             else:
-                children = LibGdrive.get_children(folder_id, service=service, fields=['id','name','mimeType','trashed','size','parents','shortcutDetails'])
+                children = LibGdrive.get_children(folder_id, service=service, fields=['id','name','mimeType','trashed','size','parents','createdTime','shortcutDetails'])
 
             if children == None:
                 logger.error(f'failed to get children: {folder_id}')

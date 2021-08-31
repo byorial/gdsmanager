@@ -7,20 +7,18 @@
 <div>
 <form id="form_search" name="form_search" class="form-inline" style="text-align:left">
     <div class="container-fluid">
-      <div class="row show-grid" align="center">
-        <span class="col-md-12" align="center">
-          <span class="col-md-2" style="align-items:center; text-align:center;">
+      <div class="row show-grid" align="left">
+        <span class="col-md-12" align="left">
            <span id="projection_options_span"></span>
-	  </span>
-          <span class="col-md-2" style="align-items:center; text-align:center;">
            <span id="remote_options_span"></span>
-          </span>
-	  <span class="col-md-5">
            <input type="text" id="current_path" class="form-control form-control-sm w-50" placeholder="현재경로가표시됨" readonly>
-	  </span>
-          <span class="col-md-3">
+	    <select id="order" name="order" class="form-control form-control-sm" onchange="change_order()">
+             <option value="name" selected>이름순</option>
+             <option value="name_desc">이름역순</option>
+             <option value="ctime">생성순</option>
+             <option value="ctime_desc">생성역순</option>
+	    </select>
            {{ macros.m_button_group([['search_btn', '검색'], ['refresh_btn', '새로고침'], ['reset_cache_btn', '캐시삭제']]) }}
-          </span>
         </span>
        </div>
     </div>
@@ -229,6 +227,7 @@ function is_watched(path) {
   }
   return false;
 }
+
 function change_remote_name(remote_name) {
   curr_remote = remote_name
   curr_folder_id = 'root'
@@ -297,17 +296,43 @@ function reset_cache() {
 
 $("body").on('click', '#search_btn', function(e) {
   e.preventDefault();
-  remote_name = document.getElementById('remote_name').value;
-  listgdrive(remote_name);
+  listgdrive(curr_remote, curr_path, curr_folder_id);
 });
 
 $("body").on('click', '#refresh_btn', function(e) {
   e.preventDefault();
-  remote_name = document.getElementById('remote_name').value;
   listgdrive(curr_remote, curr_path, curr_folder_id, true);
 });
 
+function change_order() {
+  listgdrive(curr_remote, curr_path, curr_folder_id, true);
+}
+
+function dynamicSort(order) {
+  console.log(order);
+  var sortOrder = 1;
+  if(order.endsWith('_desc')) {
+      sortOrder = -1;
+  }
+  if (order.startsWith('ctime')) {
+    property = 'createdTime';
+  } else {
+    property = 'name';
+  }
+  return function (a,b) {
+    if (a['name'] == '..')  {
+      var result = 1;
+    } else if (b['name'] == '..') {
+      var result = 0;
+    } else {
+      var result = (a[property] < b[property]) ? -1 : (a[property] > b[property]) ? 1 : 0;
+    }
+    return result * sortOrder;
+  }
+}
+
 let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
+  var order = document.getElementById('order').value;
   curr_remote = remote_name;
   curr_path = path;
   curr_folder_id = folder_id;
@@ -333,6 +358,7 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
       let new_obj = ``;
       const path_spliter = (path.indexOf('/')>=0)?'/':'\\';
       $('#select_gdrive_file_list').empty();
+      data.list = data.list.sort(dynamicSort(order));
       for (let dt of data.list) {
 	  if (dt.trashed == true) { continue;}
 	  new_obj += '<span class="list-group list-group-horizontal col-md-12" style="align:left;">'
