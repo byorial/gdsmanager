@@ -1285,7 +1285,8 @@ class GdsManager(LogicModuleBase):
         try:
             rc_path = self.get_rc_path(plex_path)
             logger.debug(f'rc_path: {rc_path}')
-            command = [RcloneModelSetting.get('rclone_bin_path'), 'rc', 'vfs/refresh', '--rc-addr']
+            command = [RcloneModelSetting.get('rclone_bin_path'), '--config', 
+                    RcloneModelSetting.get('rclone_config_path'), 'rc', 'vfs/refresh', '--rc-addr']
             command.append(ModelSetting.get('gds_rc_addr'))
             if ModelSetting.get_bool('gds_use_rc_auth'):
                 command.append('--rc-user')
@@ -1537,18 +1538,27 @@ class GdsManager(LogicModuleBase):
             logger.debug(req.form)
             fileid = req.form['fileid']
             remote_name = req.form['remote_name']
+            fname = req.form['fname']
             if not fileid:
                 logger.error('fileid is required')
                 return {'ret':'error', 'msg':'fileid is required'}
 
-            if self.gds_auth() == False:
-                logger.error(f'failed to get authorize by remote_name({remote_name})')
-                return {'ret':'error', 'msg': 'Failed to auth gdrive api'}
+            remote = self.get_remote_by_name(remote_name)
+            if remote_name == ModelSetting.get('gds_remote_name') \
+                    or (ModelSetting.get_bool('user_sjva_group_account') \
+                    and remote_name == ModelSetting.get('sjva_group_remote_name')):
 
-            if ModelSetting.get_bool('use_sjva_group_account'):
-                service = self.service
+                if self.gds_auth() == False:
+                    logger.error(f'failed to get authorize by remote_name({remote_name})')
+                    return {'ret':'error', 'msg': 'Failed to auth gdrive api'}
+
+                if ModelSetting.get_bool('use_sjva_group_account'):
+                    service = self.service
+                else:
+                    service = LibGdrive.auth_by_rclone_remote(remote)
             else:
-                service = LibGdrive.sa_auth_by_creds(self.gds_creds)
+                service = LibGdrive.auth_by_rclone_remote(remote)
+
             if not service:
                 return {'ret':'error', 'msg': 'Failed to auth gdrive api'}
 
@@ -1559,7 +1569,11 @@ class GdsManager(LogicModuleBase):
             downloader = MediaIoBaseDownload(fh, request)
             done = False
             while done is False: status, done = downloader.next_chunk()
-            json_data = json.loads(fh.getvalue().decode('utf-8'))
+            if fname.endswith('.json'):
+                json_data = json.loads(fh.getvalue().decode('utf-8'))
+            else: # yaml
+                import yaml
+                json_data = yaml.load(fh.getvalue().decode('utf-8'))
             return {'ret':'success', 'data':json_data}
 
         except Exception as e:

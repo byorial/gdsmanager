@@ -401,13 +401,13 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
 	    if (curr_remote == gds_remote) {
               new_obj += '<a href="#" class="list-group-item list-group-item-action item_path ctxfile col-md-8" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.shortcutDetails.targetId+'" name="'+dt.name+'" style="text-align:left;">'+dt.name+'</a>';
 	    } else {
-              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path col-md-8" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.shortcutDetails.targetId+'" style="text-align:left;">'+dt.name+'</a>';
+              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path col-md-8" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.shortcutDetails.targetId+'" name="'+dt.name+'" style="text-align:left;">'+dt.name+'</a>';
 	    }
 	  } else {
 	    if (curr_remote == gds_remote) {
               new_obj += '<a href="#" class="list-group-item list-group-item-action item_path ctxfile col-md-8" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'" style="text-align:left;">'+dt.name+'</a>';
 	    } else {
-              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path col-md-8" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" style="text-align:left;">'+dt.name+'</a>';
+              new_obj += '<a href="#" class="list-group-item list-group-item-action item_path col-md-8" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'"  style="text-align:left;">'+dt.name+'</a>';
 	    }
 	  }
 	  new_obj += '<span class="list-group-item col-md-2">'
@@ -448,7 +448,7 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
 	  }  else if (fname.endsWith('.srt')) {
             subtitle_fileid = new_folder_id;
             $.notify('<strong>재생용 자막으로 설정하였습니다.</strong><br/>파일명: '+fname, {type: 'success'});
-	  } else if (mtype == 'application/json') {
+	  } else if (mtype == 'application/json' || fname.endsWith('.yaml')) {
             json_load(fname, new_folder_id, mtype);
 	  } else {
 	    alert('지원하지 않는 미디어 유형입니다.\n(type; '+mtype+')');
@@ -635,7 +635,7 @@ function json_load(fname, fileid, mtype) {
     url: '/'+package_name+'/ajax/'+sub+'/json_load',
     type: 'POST',
     cache: false,
-    data: {remote_name:curr_remote, fileid:fileid},
+    data: {remote_name:curr_remote, fileid:fileid, fname:fname},
     dataType: 'json',
     success: function (data) {
       if (data.ret == 'success') {
