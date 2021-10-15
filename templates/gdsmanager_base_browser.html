@@ -127,7 +127,11 @@ $(document).ready(function(){
 	  name: "감시대상에 추가", icon: "fa-plus", 
 	  disabled: function(key, options) {
 	    if ($(this).attr('mtype') == 'application/vnd.google-apps.folder') {
-	      remote_path = curr_remote + ':' + curr_path + '/' + $(this).attr('name');
+	      if (curr_path == '/') {
+	        remote_path = curr_remote + ':' + curr_path + $(this).attr('name');
+	      } else {
+	        remote_path = curr_remote + ':' + curr_path + '/' + $(this).attr('name');
+	      }
 	      if (is_watched(remote_path)) {
 		return true;
 	      } else {
@@ -506,7 +510,11 @@ function get_media_type(path) {
 function add_watch(mtype, name, folder_id) {
   var mtypes = ['show', 'movie'];
   if (name != '..') {
-    var remote_path = curr_remote + ':' + curr_path + '/' + name;
+    if (curr_path == '/') {
+      var remote_path = curr_remote + ':' + curr_path + name;
+    } else {
+      var remote_path = curr_remote + ':' + curr_path + '/' + name;
+    }
   } else {
     var remote_path = curr_remote + ':' + curr_path;
   }
