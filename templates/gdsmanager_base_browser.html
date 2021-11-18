@@ -376,7 +376,7 @@ let listgdrive = (remote_name, path = '/', folder_id = 'root', force=false) => {
             if (context_menu_right == 'True') {
 	      new_obj += '<span class="list-group-item col-md-2">shortcut</span>'
 	    } else {
-	      new_obj += '<span class="list-group-item list-group-item-action ctxmtype col-md-2" mtype="'+dt.mimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'">shortcut</span>';
+	      new_obj += '<span class="list-group-item list-group-item-action ctxmtype col-md-2" mtype="'+dt.shortcutDetails.targetMimeType+'" folder_id="'+dt.id+'" name="'+dt.name+'">shortcut</span>';
 	    }
 	  } else {
             if (dt.mimeType.startsWith('application/')) {
