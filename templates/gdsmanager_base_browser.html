@@ -115,7 +115,9 @@ $(document).ready(function(){
 	$.notify('<strong>복사됨: '+temp.value+'</strong>', {type: 'success'});
         document.body.removeChild(temp);
       } else if (key == 'refresh') {
-	refresh_vfs(mtype, name, folder_id);
+	refresh_vfs(mtype, name, folder_id, false);
+      } else if (key == 'rrefresh') {
+	refresh_vfs(mtype, name, folder_id, true);
       } else if (key == 'scan') {
 	send_scan(mtype, name, folder_id);
       } else if (key == 'file_refresh' || key == 'season_refresh' || key == 'program_refresh') {
@@ -151,7 +153,16 @@ $(document).ready(function(){
 	    }
 	  }
 	},
-        "refresh": {name: "마운트캐시갱신", icon: "fa-refresh",
+	"refresh": {name: "마운트캐시갱신", icon: "fa-refresh",
+	  disabled: function(key, options) {
+	    if ($(this).attr('name') == '..') {
+	      return true;
+	    } else {
+              return false;
+	    }
+	  }
+	},
+        "rrefresh": {name: "마운트캐시갱신(하위포함)", icon: "fa-refresh",
 	  disabled: function(key, options) {
 	    if ($(this).attr('name') == '..') {
 	      return true;
@@ -570,7 +581,7 @@ $("body").on('click', '#add_watch_btn', function(e) {
   });
 });
 
-function refresh_vfs(mtype, name, folder_id) {
+function refresh_vfs(mtype, name, folder_id, recursive) {
   if (mtype != 'application/vnd.google-apps.folder') { // file
     var target_folder_id = curr_folder_id;
     var target_remote = curr_remote + ':' + curr_path;
@@ -582,7 +593,7 @@ function refresh_vfs(mtype, name, folder_id) {
     url: '/'+package_name+'/ajax/'+sub+'/refresh_vfs',
     type: 'POST',
     cache: false,
-    data: {remote_path:target_remote, folder_id:target_folder_id},
+    data: {remote_path:target_remote, folder_id:target_folder_id, recursive:recursive},
     dataType: 'json',
     success: function (data) {
       if (data.ret == 'success') {

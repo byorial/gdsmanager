@@ -775,16 +775,27 @@ class GdsManager(LogicModuleBase):
             logger.debug(req.form)
             remote_path = req.form['remote_path']
             folder_id = req.form['folder_id']
-            logger.debug(f'refresh_vfs: {remote_path},{folder_id}')
+            recursive = True if req.form['recursive'] == 'true' else False
+            logger.debug(f'refresh_vfs: {remote_path},{folder_id},{recursive}')
 
             plex_path = self.get_plex_path(remote_path)
-            ret = self.gds_vfs_refresh(plex_path)
+            ret = self.gds_vfs_refresh(plex_path, recursive=recursive)
             if ret['ret'] != 'success':
                 logger.error(f'failed to vfs/refresh: {plex_path}')
                 return {'ret':'error', 'msg':f'vfs/refresh 실패:{plex_path}'}
 
             logger.debug(f'refresh_vfs: END:{remote_path}')
-            return {'ret':'success', 'msg':f'완료: {remote_path}'}
+            if 'jobid' in ret:
+                jobid = int(ret['jobid'])
+
+                def func():
+                    self.vfs_refresh_check_thread(plex_path, jobid)
+
+                thread = threading.Thread(target=func, args=())
+                thread.setDaemon(True)
+                thread.start()
+
+            return {'ret':'success', 'msg':f'갱신요청완료: {remote_path}'}
 
         except Exception as e:
             logger.error('Exception:%s', e)
@@ -1657,6 +1668,25 @@ class GdsManager(LogicModuleBase):
                 self.FullScanQueue.put(req)
             else:
                 logger.debug(f'[전체스캔] rclone 캐시 갱신처리 실패: {plex_path})')
+
+        except Exception as e:
+            logger.debug('Exception:%s', e)
+            logger.debug(traceback.format_exc())
+            return
+
+
+    def vfs_refresh_check_thread(self, plex_path, jobid):
+        try:
+            logger.debug(f'[캐시갱신] rclone 캐시 갱신확인:{plex_path},{jobid}')
+            success = self.check_rc_job_completed(jobid)
+            if success:
+                logger.debug(f'[캐시갱신] rclone 캐시 갱신처리 완료: {plex_path}')
+                data = {'type':'success', 'msg':f'rclone 캐시 갱신처리 완료: {plex_path}'}
+            else:
+                logger.debug(f'[캐시갱신] rclone 캐시 갱신처리 실패: {plex_path})')
+                data = {'type':'warning', 'msg':f'rclone 캐시 갱신처리 실패: {plex_path}'}
+
+            socketio.emit("notify", data, namespace='/framework', broadcate=True)
 
         except Exception as e:
             logger.debug('Exception:%s', e)
