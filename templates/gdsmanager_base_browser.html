@@ -588,6 +588,9 @@ function refresh_vfs(mtype, name, folder_id, recursive) {
   } else { // folder
     var target_folder_id = folder_id;
     var target_remote = curr_remote + ':' + curr_path + '/' + name;
+    if (curr_path == '/') {
+      target_remote = curr_remote + ':' + curr_path + name;
+    }
   }
   $.ajax({
     url: '/'+package_name+'/ajax/'+sub+'/refresh_vfs',
@@ -612,6 +615,9 @@ function send_scan(mtype, name, folder_id) {
   } else { // folder
     var target_folder_id = folder_id;
     var target_remote = curr_remote + ':' + curr_path + '/' + name;
+    if (curr_path == '/') {
+      target_remote = curr_remote + ':' + curr_path + name;
+    }
   }
   $.ajax({
     url: '/'+package_name+'/ajax/'+sub+'/send_scan',
