@@ -37,7 +37,7 @@ class P(object):
         },
     }
     plugin_info = {
-        'version' : '0.1.3.2',
+        'version' : '0.1.3.3',
         'name' : package_name,
         'category_name' : 'service',
         'icon' : '',
@@ -45,6 +45,12 @@ class P(object):
         'description' : u'구드공 바로보기 변경사항 조회 및 갱신 플러그인',
         'home' : 'https://github.com/byorial/%s' % package_name,
         'more' : '',
+        "dependency": [
+            {
+                "name": "lib_gdrive",
+                "home": "https://github.com/byorial/lib_gdrive"
+            }
+        ]
     }
     ModelSetting = get_model_setting(package_name, logger)
     logic = None

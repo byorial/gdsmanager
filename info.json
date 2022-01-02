@@ -1,10 +1,16 @@
 {
-    "version": "0.1.3.2",
+    "version": "0.1.3.3",
     "name": "gdsmanager",
     "category_name": "service",
     "icon": "",
     "developer": "orial",
     "description": "구드공 바로보기 변경사항 조회 및 갱신 플러그인",
     "home": "https://github.com/byorial/gdsmanager",
-    "more": ""
+    "more": "",
+    "dependency": [
+        {
+            "name": "lib_gdrive",
+            "home": "https://github.com/byorial/lib_gdrive"
+        }
+    ]
 }
