@@ -358,7 +358,7 @@ class GdsManager(LogicModuleBase):
     def get_remote_by_name(self, remote_name):
         try:
             if remote_name == ModelSetting.get('gds_remote_name'):
-                return {'root_folder_id':self.gds_root_folder_id, 'service_account_file':ModelSetting.get('gds_sa_path')}
+                return {'root_folder_id':self.gds_root_folder_id }
             remotes = ToolRclone.config_list()
             if remote_name in remotes:
                 return remotes[remote_name]
@@ -1368,11 +1368,14 @@ class GdsManager(LogicModuleBase):
             logger.debug(f'감시대상 갱신: {from_remote} > {ttoo_remote}')
             for entity in WatchItem.get_all_entities():
                 entity.remote_path = entity.remote_path.replace(from_remote, ttoo_remote)
-                subfolders = json.loads(entity.subfolders)
-                for folder_id, dname in subfolders.items():
-                    subfolders[folder_id] = dname.replace(from_remote, ttoo_remote)
-                entity.subfolders = json.dumps(subfolders)
-                entity.save()
+                try:
+                    subfolders = json.loads(entity.subfolders)
+                    for folder_id, dname in subfolders.items():
+                        subfolders[folder_id] = dname.replace(from_remote, ttoo_remote)
+                    entity.subfolders = json.dumps(subfolders)
+                    entity.save()
+                except:
+                    logger.error(f'서브폴더 로드 실패: {entity.remote_path}')
 
             return {'ret':'success', 'msg':f'리모트 업데이트 완료:{from_remote} > {ttoo_remote}'}
 

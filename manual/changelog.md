@@ -1,5 +1,7 @@
 ### 업데이트 내역
 ---
+##### v0.1.3.4 (22.01.21) 버그 수정
+* remote 인증 오류나는 경우 수정
 ##### v0.1.3.3 (22.01.02) plugin info에 dependency 추가
 * plugin info에 dependency 반영(lib_gdrive)
 ##### v0.1.3.2 (21.12.30) 최상위 경로 캐시갱신 오류 수정

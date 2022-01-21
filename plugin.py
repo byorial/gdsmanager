@@ -37,7 +37,7 @@ class P(object):
         },
     }
     plugin_info = {
-        'version' : '0.1.3.3',
+        'version' : '0.1.3.4',
         'name' : package_name,
         'category_name' : 'service',
         'icon' : '',
