@@ -539,7 +539,7 @@ class GdsManager(LogicModuleBase):
                 #logger.debug('GDS remote auth success')
 
             remote = self.get_remote_by_name(remote_name)
-            logger.debug(f'{remote}')
+            #logger.debug(f'{remote}')
             if folder_id == 'root':
                 is_root = True
                 if 'root_folder_id' in remote: folder_id = remote['root_folder_id']
