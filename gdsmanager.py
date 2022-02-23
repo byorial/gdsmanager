@@ -507,6 +507,15 @@ class GdsManager(LogicModuleBase):
             force = req.form['force'] if 'force' in req.form else 'false'
             is_root = False
 
+            if remote_name == '':
+                if ModelSetting.get_bool('use_sjva_group_account') == False:
+                    remote_name = ModelSetting.get('gds_remote_name')
+                else:
+                    remote_name = ModelSetting.get('sjva_group_remote_name')
+
+                folder_id = 'root'
+                path = '/'
+
             #logger.debug(f'listgdrive: {remote_name}:{path},{folder_id},{force}')
             self.last_remote = remote_name
             self.last_folderid = folder_id
@@ -530,6 +539,7 @@ class GdsManager(LogicModuleBase):
                 #logger.debug('GDS remote auth success')
 
             remote = self.get_remote_by_name(remote_name)
+            logger.debug(f'{remote}')
             if folder_id == 'root':
                 is_root = True
                 if 'root_folder_id' in remote: folder_id = remote['root_folder_id']
