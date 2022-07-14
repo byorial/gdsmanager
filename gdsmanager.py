@@ -173,13 +173,14 @@ class GdsManager(LogicModuleBase):
     def process_menu(self, sub, req):
         try:
             #logger.debug(f'sub: {sub}')
-            #logger.debug(req.form)
+            logger.debug(req.form)
             arg = ModelSetting.to_dict()
             name = self.name
             arg['sub'] = name
             arg['proxy_url'] = ToolUtil.make_apikey_url(f'/{package_name}/api/{name}/proxy')
             arg['proxy_subtitle_url'] = ToolUtil.make_apikey_url(f'/{package_name}/api/{name}/proxy')
 
+            if sub == 'null': sub = 'setting'
             if sub == 'setting':
                 arg['scheduler'] = str(scheduler.is_include(self.get_scheduler_name()))
                 arg['is_running'] = str(scheduler.is_running(self.get_scheduler_name()))
@@ -207,6 +208,8 @@ class GdsManager(LogicModuleBase):
                     arg['play_subtitle_src'] = req.form['play_subtitle_src']
                 if sub == 'vrvideo':
                     arg['play_vr_projection'] = req.form['play_vr_projection']
+
+            logger.debug(f'pkg:{self.name}, sub: {sub}')
             return render_template(f"{package_name}_{self.name}_{sub}.html", arg=arg)
         except Exception as exception:
             logger.error('Exception:%s', exception)
@@ -1260,6 +1263,7 @@ class GdsManager(LogicModuleBase):
             else:
                 gds_remote_root = ModelSetting.get('gds_remote_name') + ':'
             plex_mount_path = ModelSetting.get('gds_plex_mount_path')
+            logger.debug(f'remote: {remote_path}, gds_remote: {gds_remote_root}, plex_mount: {plex_mount_path}')
             if remote_path.startswith(gds_remote_root):
                 ret = remote_path.replace(gds_remote_root, plex_mount_path)
                 if plex_mount_path[0] != '/': ret = ret.replace('/', '\\')
